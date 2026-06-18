@@ -112,6 +112,9 @@ export default function AIWorkspace({ activeForm, selectForm, onNavigate, forms,
           settings
         })
       });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
       selectForm(data);
       if (setForms) {
@@ -140,6 +143,9 @@ export default function AIWorkspace({ activeForm, selectForm, onNavigate, forms,
         headers: authHeaders,
         body: JSON.stringify({ prompt: aiPrompt })
       });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
       
       // Load generated form configs into current state

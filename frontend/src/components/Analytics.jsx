@@ -368,6 +368,9 @@ export default function Analytics({ activeForm, selectForm, onNavigate, forms, a
     try {
       if (activeForm) {
         const response = await fetch(`/api/forms/${activeForm.id}/analytics`, { headers: authHeaders });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const data = await response.json();
         setAnalyticsData(data);
         if (data.semantic_map?.clusters?.length > 0) {
@@ -378,6 +381,9 @@ export default function Analytics({ activeForm, selectForm, onNavigate, forms, a
         }
       } else {
         const response = await fetch('/api/stats', { headers: authHeaders });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const data = await response.json();
         setAnalyticsData(data);
       }
@@ -622,6 +628,9 @@ export default function Analytics({ activeForm, selectForm, onNavigate, forms, a
           user_question: userText
         })
       });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
       setCohortMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
     } catch (err) {

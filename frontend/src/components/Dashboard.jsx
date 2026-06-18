@@ -74,6 +74,10 @@ export default function Dashboard({ onNavigate, forms, setForms, selectForm, set
         body: JSON.stringify(payload)
       });
       
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const newForm = await response.json();
       setForms(prevForms => [newForm, ...prevForms]);
       selectForm(newForm);
