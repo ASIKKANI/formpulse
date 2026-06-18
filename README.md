@@ -1,83 +1,159 @@
-# FormPulse — Conversations That Collect
+<p align="center">
+  <img src="logo.png" alt="FormPulse Logo" width="180" />
+</p>
 
-AI-powered conversational forms that replace boring surveys with natural dialogues. Real-time sentiment analytics, voice transcription, fatigue detection, and semantic clustering.
+<h1 align="center">FormPulse</h1>
 
-**Stack:** React · FastAPI · Groq LLM · Supabase · Scikit-learn
+<p align="center">
+  <strong>Conversations That Collect</strong> — Next-generation conversational survey engine replacing static forms with natural dialogues, real-time sentiment analytics, voice transcription, and semantic cohort clustering.
+</p>
+
+<p align="center">
+  <a href="#key-features">Key Features</a> &bull;
+  <a href="#architecture-and-structure">Architecture</a> &bull;
+  <a href="#getting-started">Getting Started</a> &bull;
+  <a href="#environment-configuration">Environment Configuration</a> &bull;
+  <a href="#production-deployment">Production Deployment</a> &bull;
+  <a href="#security--multi-tenancy">Security</a>
+</p>
 
 ---
 
-## Features
+## Overview
 
-- 🤖 **AI Form Generation** — Describe your survey in plain English, get a full conversational form
-- 💬 **Natural Dialogue Engine** — Respondents chat instead of filling fields
-- 🎙️ **Voice Transcription** — Groq Whisper-powered voice input
-- 📊 **Real-time Analytics** — Sentiment analysis, semantic clustering, response trends
-- 🧠 **Synthetic Cohort Chat** — Talk to AI personas representing your respondent groups
-- 🔐 **Google OAuth** — Supabase Auth with multi-tenant data isolation
-- 😓 **Fatigue Detection** — Auto-completes surveys when respondents tire out
+FormPulse is an enterprise-grade, multi-tenant survey platform designed to maximize response yields and capture deep qualitative insights. By substituting rigid web forms with dynamic, context-aware conversational agents, the platform dramatically reduces fatigue-induced drop-off. The built-in analysis suite leverages machine learning to cluster unstructured feedback into actionable user cohorts, exposing performance bottlenecks, friction points, and product opportunities in real time.
 
-## Project Structure
+## Key Features
+
+* **AI-Driven Form Compilation:** Compile complex, multi-variable survey objectives expressed in natural language into structured target schemas instantly.
+* **Natural Pacing Flow Engine:** Conversational agents parse dialogue inputs, evaluate respondent fatigue, and pace questions dynamically based on configured pacing schemas.
+* **Whisper Audio Ingestion:** Integrated audio voice note transcription using Groq Whisper-large-v3, allowing hands-free responses.
+* **Semantic Analysis & Clustering:** Automated TF-IDF vectorization and K-Means clustering organize text responses into distinct thematic cohorts, mapped dynamically in vector space.
+* **Synthetic Cohort Querying:** Interactive roleplay engine simulating aggregate feedback. Researchers can chat directly with AI representatives of specific user cohorts.
+* **Secure Multi-Tenancy:** Secure authentication utilizing Supabase Auth (OAuth / Google) with robust token validation supporting both symmetric HS256 and asymmetric ES256 JWKS verification schemes.
+* **SQLite Fallback Sandbox:** Local, zero-config sqlite execution mode for offline sandbox testing.
+
+## Architecture and Structure
+
+The system is split into a React-based frontend single-page application and a high-performance Python FastAPI backend web service.
 
 ```
-├── frontend/          # React + Vite SPA
+├── frontend/                   # React Single-Page Application
 │   ├── src/
-│   │   ├── App.jsx              # Auth flow, routing, layout
+│   │   ├── App.jsx             # Authentication listener, routing, global state
 │   │   ├── components/
-│   │   │   ├── Dashboard.jsx    # Form management + KPI cards
-│   │   │   ├── AIWorkspace.jsx  # Form editor + AI refinement
-│   │   │   ├── Analytics.jsx    # Charts, clusters, cohort chat
-│   │   │   └── FormFiller.jsx   # Respondent chat interface
+│   │   │   ├── Dashboard.jsx   # Form directory, creation wizard, KPI metrics
+│   │   │   ├── AIWorkspace.jsx # Interactive schema editor and AI refinement
+│   │   │   ├── Analytics.jsx   # Canvas scatter plot, timelines, cohort chat
+│   │   │   └── FormFiller.jsx  # Conversational respondent interface
 │   │   └── lib/
 │   │       └── supabaseClient.js
-│   └── .env.example
-├── backend/           # FastAPI + SQLAlchemy
-│   ├── main.py        # API endpoints
-│   ├── database.py    # Supabase PostgreSQL / SQLite fallback
-│   ├── llm_provider.py # Groq LLM integration
-│   ├── clustering.py  # TF-IDF + K-Means response clustering
-│   └── .env.example
-└── vercel.json        # Frontend deployment config
+│   └── vercel.json             # Frontend rewrite routing rules
+├── backend/                    # FastAPI Web Service
+│   ├── main.py                 # API endpoints, JWT token verification
+│   ├── database.py             # SQLAlchemy models (PostgreSQL / SQLite)
+│   ├── llm_provider.py         # LLM completion loops and Whisper transcription
+│   ├── clustering.py           # ML-based response vectorization & clustering
+│   └── render.yaml             # Render infrastructure deployment config
+└── logo.png                    # Project logo asset
 ```
 
-## Local Development
+## Getting Started
 
-### Backend
-```bash
-cd backend
-python -m venv .venv
-.venv/Scripts/activate  # Windows
-pip install -r requirements.txt
-cp .env.example .env    # Add your GROQ_API_KEY
-uvicorn main:app --reload --port 8000
-```
+### Prerequisites
 
-### Frontend
-```bash
-cd frontend
-npm install
-cp .env.example .env    # Add Supabase keys (optional)
-npm run dev
-```
+* Python 3.11+
+* Node.js 18+
 
-## Environment Variables
+### Backend Setup
 
-### Backend (`backend/.env`)
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+2. Initialize virtual environment:
+   ```bash
+   python -m venv .venv
+   .venv/Scripts/activate  # On Windows
+   # source .venv/bin/activate  # On macOS/Linux
+   ```
+3. Install required packages:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Copy the environment variables template and fill in your keys:
+   ```bash
+   cp .env.example .env
+   ```
+5. Launch the development server:
+   ```bash
+   uvicorn main:app --reload --port 8000
+   ```
+
+### Frontend Setup
+
+1. Navigate to the frontend directory:
+   ```bash
+   cd frontend
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Copy the environment variables template and configure your Supabase instance:
+   ```bash
+   cp .env.example .env
+   ```
+4. Start the local development server:
+   ```bash
+   npm run dev
+   ```
+   *(The local Vite server runs on port 3000 to match the default redirect configuration)*
+
+---
+
+## Environment Configuration
+
+### Backend Configuration (`backend/.env`)
+
 | Variable | Required | Description |
-|----------|----------|-------------|
-| `GROQ_API_KEY` | Yes | Groq API key for LLM + Whisper |
-| `SUPABASE_DATABASE_URL` | No | PostgreSQL connection string (falls back to SQLite) |
-| `SUPABASE_JWT_SECRET` | No | For validating auth tokens |
+|---|---|---|
+| `GROQ_API_KEY` | Yes | API access key for Groq LLM and Whisper |
+| `SUPABASE_DATABASE_URL` | No | PostgreSQL connection string (falls back to local SQLite if omitted) |
+| `SUPABASE_JWT_SECRET` | No | Base64-encoded secret key used for verifying symmetric HS256 tokens |
 
-### Frontend (`frontend/.env`)
+### Frontend Configuration (`frontend/.env`)
+
 | Variable | Required | Description |
-|----------|----------|-------------|
-| `VITE_SUPABASE_URL` | No | Supabase project URL (skip for sandbox mode) |
-| `VITE_SUPABASE_ANON_KEY` | No | Supabase anon key |
+|---|---|---|
+| `VITE_SUPABASE_URL` | No | Supabase API Endpoint URL (falls back to local sandbox mode if omitted) |
+| `VITE_SUPABASE_ANON_KEY` | No | Supabase Anon API key |
 
-## Deployment
+---
 
-- **Frontend** → Vercel (auto-deploys from GitHub)
-- **Backend** → Render (uses `render.yaml`)
+## Production Deployment
+
+### Frontend (Vercel)
+
+Ensure that you add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to your Vercel Environment Variables. The frontend uses `frontend/vercel.json` to configure rewrite proxying of `/api/*` requests to your deployed backend.
+
+### Backend (Render)
+
+The backend is configured for automated builds on Render via `backend/render.yaml`.
+Make sure the following variables are configured in the Render Dashboard under Environment Settings:
+* `SUPABASE_DATABASE_URL`
+* `SUPABASE_JWT_SECRET`
+* `GROQ_API_KEY`
+
+---
+
+## Security & Multi-Tenancy
+
+FormPulse secures creator data using row-level filters matching the verified identity token (`sub` claim) from Supabase. The FastAPI backend verifies the integrity of these JWTs dynamically:
+* **Asymmetric Tokens (ES256):** Fetches the project-specific public key from the Supabase JSON Web Key Set (JWKS) endpoints to verify asymmetric signatures.
+* **Symmetric Tokens (HS256):** Verifies the signature using the configured `SUPABASE_JWT_SECRET` (supporting both raw and base64-encoded formats).
+
+---
 
 ## License
 
