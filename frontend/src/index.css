@@ -1083,3 +1083,75 @@ body {
   color: var(--warning);
   font-weight: 500;
 }
+
+/* ========================= */
+/* Print Layout Styles       */
+/* ========================= */
+@media print {
+  /* Hide interactive/non-printable components */
+  .no-print,
+  .header-bar,
+  .nav-links,
+  .button-primary,
+  .button-secondary,
+  .button-icon,
+  .sign-out-btn,
+  .db-fallback-banner {
+    display: none !important;
+  }
+
+  /* Reset layout constraints for printing */
+  body, 
+  .app-container, 
+  .scroll-pane,
+  main {
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+    height: auto !important;
+    position: static !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Ensure card containers look flat and crisp */
+  .card-container, 
+  .kpi-card {
+    background: #ffffff !important;
+    border: 1px solid #e4e4e7 !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+    margin-bottom: 1.5rem !important;
+    padding: 1.25rem !important;
+  }
+
+  .dashboard-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 1rem !important;
+    padding: 1rem 0 !important;
+  }
+
+  .equal-two-columns,
+  .two-column-layout {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 1.5rem !important;
+  }
+
+  /* Force background colors and gradients to print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide charts zoom/pan buttons */
+  .card-container div[style*="position: absolute"] {
+    display: none !important;
+  }
+
+  /* Specific typography fixes */
+  h1, h2, h3, h4 {
+    color: #09090b !important;
+  }
+}

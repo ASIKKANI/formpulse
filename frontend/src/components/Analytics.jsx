@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   BarChart3, Brain, MessageSquare, AlertTriangle, 
-  ArrowLeft, Users, RefreshCw, Send, ZoomIn, ZoomOut, Move, Activity
+  ArrowLeft, Users, RefreshCw, Send, ZoomIn, ZoomOut, Move, Activity,
+  Download
 } from 'lucide-react';
 
 // --- SUB-COMPONENT: High-Performance Canvas Scatter Plot ---
@@ -442,9 +443,14 @@ export default function Analytics({ activeForm, selectForm, onNavigate, forms, a
             <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Overall Pipeline Analytics</h2>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Aggregated cross-form conversational metrics</span>
           </div>
-          <button className="button-secondary" onClick={fetchAnalytics}>
-            <RefreshCw size={14} /> Refresh Data
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="button-secondary no-print" onClick={() => window.print()} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <Download size={14} /> Export PDF
+            </button>
+            <button className="button-secondary no-print" onClick={fetchAnalytics}>
+              <RefreshCw size={14} /> Refresh Data
+            </button>
+          </div>
         </div>
 
         {/* Global KPIs */}
@@ -689,7 +695,7 @@ export default function Analytics({ activeForm, selectForm, onNavigate, forms, a
       {/* Analytics Toolbar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 2rem 1.5rem 2rem', borderBottom: '1px solid var(--card-border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button className="button-secondary" onClick={() => selectForm(null)} style={{ padding: '0.5rem 0.8rem' }}>
+          <button className="button-secondary no-print" onClick={() => selectForm(null)} style={{ padding: '0.5rem 0.8rem' }}>
             <ArrowLeft size={16} /> Back to Global
           </button>
           <div>
@@ -698,9 +704,14 @@ export default function Analytics({ activeForm, selectForm, onNavigate, forms, a
           </div>
         </div>
 
-        <button className="button-secondary" onClick={fetchAnalytics}>
-          <RefreshCw size={16} /> Re-Cluster Data
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button className="button-secondary no-print" onClick={() => window.print()} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <Download size={14} /> Export PDF
+          </button>
+          <button className="button-secondary no-print" onClick={fetchAnalytics}>
+            <RefreshCw size={16} /> Re-Cluster Data
+          </button>
+        </div>
       </div>
 
       {/* KPI stats summary block */}
