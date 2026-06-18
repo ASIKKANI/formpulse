@@ -1085,6 +1085,117 @@ body {
 }
 
 /* ========================= */
+/* Terminal Scan Loader      */
+/* ========================= */
+.terminal-loader-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem;
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  min-height: 280px;
+}
+
+.terminal-console {
+  width: 100%;
+  max-width: 460px;
+  background-color: #09090b;
+  border-radius: 8px;
+  border: 1px solid #27272a;
+  padding: 1.25rem;
+  font-family: var(--font-mono);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  margin-top: 1rem;
+}
+
+.terminal-header {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid #18181b;
+  padding-bottom: 0.5rem;
+}
+
+.terminal-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.terminal-dot.red { background-color: #ef4444; }
+.terminal-dot.yellow { background-color: #f59e0b; }
+.terminal-dot.green { background-color: #10b981; }
+
+.terminal-body {
+  color: #a1a1aa;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.terminal-line {
+  margin: 0.35rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.terminal-prompt {
+  color: #10b981;
+  font-weight: 700;
+}
+
+.terminal-text {
+  color: #f4f4f5;
+}
+
+.terminal-cursor {
+  display: inline-block;
+  width: 6px;
+  height: 14px;
+  background-color: #10b981;
+  animation: terminalBlink 0.8s infinite;
+}
+
+@keyframes terminalBlink {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+.mode-tab-bar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--card-border);
+  padding-bottom: 0.5rem;
+}
+
+.mode-tab {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.mode-tab:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-color);
+}
+
+.mode-tab.active {
+  background-color: var(--accent-glow);
+  color: var(--text-primary);
+  border: 1px solid var(--card-border);
+}
+
+/* ========================= */
 /* Print Layout Styles       */
 /* ========================= */
 @media print {

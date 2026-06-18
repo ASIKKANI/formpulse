@@ -168,6 +168,136 @@ def generate_form_schema(prompt: str) -> dict:
         # Return fallback on error directly instead of recursive calls (fixes infinite recursion bug!)
         return _generate_mock_schema_from_prompt(prompt)
 
+def generate_form_schema_from_webpage(url: str, text_content: str) -> dict:
+    """
+    Scrapes the text content of a company homepage, extracts their brand details,
+    and returns a structured Form config matching the page's domain and tone.
+    """
+    if not client:
+        return _generate_mock_schema_from_webpage(url)
+
+    system_prompt = (
+        "You are an expert brand analyst and conversational flow designer.\n"
+        "You are given a target company's URL and the raw text scraped from their homepage.\n"
+        "Your task is to analyze their product features, brand voice, and customer target group, "
+        "and design a customized conversational survey schema in JSON. You must ONLY output JSON.\n\n"
+        "The output must match this JSON structure:\n"
+        "{\n"
+        "  \"title\": \"A clear, brief title representing the brand survey (e.g. 'Supabase Developer Survey')\",\n"
+        "  \"objective\": \"Detailed operational objective summarizing what the conversation should discover from their users\",\n"
+        "  \"schema_fields\": [\n"
+        "    {\n"
+        "      \"id\": \"unique_snake_case_id\",\n"
+        "      \"label\": \"Human readable question label\",\n"
+        "      \"type\": \"text\" | \"number\" | \"choice\",\n"
+        "      \"required\": true | false,\n"
+        "      \"choices\": [\"Only if type is choice, list options\"] or null,\n"
+        "      \"description\": \"What this field aims to capture\",\n"
+        "      \"pacing_question\": \"A warm, open-ended, and highly casual way to ask for this information naturally in a chat conversation\"\n"
+        "    }\n"
+        "  ],\n"
+        "  \"guardrails\": {\n"
+        "    \"system_instructions\": \"Direct instructions for the conversational bot matching the brand tone. E.g. Stay technical and precise, use developer terminology, remain empathetic and helpful.\",\n"
+        "    \"topics_allowed\": \"Comma separated list of allowed keywords or themes of debate based on their products\"\n"
+        "  },\n"
+        "  \"settings\": {\n"
+        "    \"allow_voice\": true,\n"
+        "    \"fatigue_threshold\": 0.7,\n"
+        "    \"code_switching\": true\n"
+        "  }\n"
+        "}"
+    )
+
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"URL: {url}\n\nWebpage text content:\n{text_content[:8000]}"}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2
+        )
+        result = json.loads(completion.choices[0].message.content)
+        return result
+    except Exception as e:
+        print(f"Error calling Groq for webpage schema: {e}")
+        return _generate_mock_schema_from_webpage(url)
+
+def _generate_mock_schema_from_webpage(url: str) -> dict:
+    # Extract domain name
+    domain = "brand"
+    try:
+        if "://" in url:
+            domain = url.split("://")[-1].split("www.")[-1].split(".")[0].lower()
+    except Exception:
+        pass
+    
+    # Capitalize for title
+    name = domain.capitalize() if domain else "Your Brand"
+    
+    # Tailored mock responses
+    if "stripe" in domain:
+        title = "Stripe Payment Integration Survey"
+        objective = "Understand developer experience with Stripe SDKs, billing API latency, and payment gateway checkout friction."
+        fields = [
+            {"id": "developer_experience", "label": "API integration experience", "type": "choice", "choices": ["Extremely easy", "Moderate friction", "Difficult"], "required": True, "description": "Ease of integrating Stripe APIs"},
+            {"id": "latency_concerns", "label": "Webhooks or API latency issues", "type": "text", "required": False, "description": "Webhook and request processing speed"},
+            {"id": "billing_tier_value", "label": "Billing products satisfaction (1-5)", "type": "number", "required": True, "description": "Rating of Stripe Billing options"}
+        ]
+        allowed = "payments, stripe, api, billing, latency, checkout, integration"
+        instr = "Be highly technical and developer-focused. Use precise engineering terms."
+    elif "supabase" in domain:
+        title = "Supabase Database Scaling Survey"
+        objective = "Identify developer bottlenecks with real-time replication, Row-Level Security policy setup, and pgvector clustering."
+        fields = [
+            {"id": "postgres_experience", "label": "PostgreSQL management friction", "type": "text", "required": True, "description": "Issues with migrations or scaling databases"},
+            {"id": "rls_friction", "label": "Row-Level Security policy setup ease", "type": "choice", "choices": ["Straightforward", "Highly complex", "Bypassed it"], "required": True, "description": "RLS policy friction"},
+            {"id": "realtime_latency", "label": "Real-time subscriptions speed", "type": "text", "required": False, "description": "Latency in realtime websocket connections"}
+        ]
+        allowed = "supabase, postgres, database, rls, scaling, postgresql, vector"
+        instr = "Stay highly technical. Speak to the user as a database administrator or platform engineer."
+    elif "formplus" in domain or "formpl" in domain:
+        title = "FormPulse Competitor Churn Survey"
+        objective = "Extract feedback from users evaluating Formplus. Pinpoint areas related to file uploads, styling flexibility, and document generation."
+        fields = [
+            {"id": "migration_reason", "label": "Primary reason for testing alternatives", "type": "choice", "choices": ["Better pricing", "More flexible API", "Conversational AI capabilities"], "required": True, "description": "Reason for switching from Formplus"},
+            {"id": "doc_merge_value", "label": "Importance of automated document generation (1-5)", "type": "number", "required": True, "description": "Valuation of Form2Doc / Document Merge feature"},
+            {"id": "offline_needs", "label": "Offline form collection requirements", "type": "text", "required": False, "description": "Details on field offline data collection usage"}
+        ]
+        allowed = "formplus, document merge, form2doc, data collection, templates, offline"
+        instr = "Remain professional and objective. Focus strictly on tool comparisons without bias."
+    else:
+        # General brand survey
+        title = f"{name} Customer Experience Survey"
+        objective = f"Expose user onboarding friction, product adoption bottlenecks, and brand positioning opportunities for {name}."
+        fields = [
+            {"id": "onboarding_friction", "label": "Onboarding speed or setup blockers", "type": "text", "required": True, "description": "Issues faced when first signing up"},
+            {"id": "core_value", "label": "Most valuable product feature", "type": "text", "required": True, "description": "Feature driving the most value"},
+            {"id": "nps_score", "label": "Recommendation score (1-10)", "type": "number", "required": True, "description": "Net Promoter Score"}
+        ]
+        allowed = f"{domain}, onboarding, product, features, satisfaction"
+        instr = "Be friendly, professional, and helpful. Guide the conversation casual but focused."
+
+    # Enrich fields with mock pacing questions
+    for f in fields:
+        f["pacing_question"] = f"Could you tell me about your {f['label'].lower()}?"
+
+    return {
+        "title": title,
+        "objective": objective,
+        "schema_fields": fields,
+        "guardrails": {
+            "system_instructions": instr,
+            "topics_allowed": allowed
+        },
+        "settings": {
+            "allow_voice": True,
+            "fatigue_threshold": 0.7,
+            "code_switching": True
+        }
+    }
+
 def plan_conversational_flow(title: str, objective: str, fields: list) -> list:
     """
     Planning Agent: Takes a form's title, objective, and a list of extraction fields.

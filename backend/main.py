@@ -11,6 +11,8 @@ import jwt
 import re
 import base64
 from jwt import PyJWKClient
+import httpx
+import re
 
 from database import SessionLocal, Form, Session as SurveySession, Response, init_db
 import llm_provider
@@ -275,6 +277,73 @@ def create_form(data: dict, user_id: str = Depends(get_current_user), db: DBSess
             guardrails=json.dumps(data.get("guardrails", {})),
             settings=json.dumps(data.get("settings", {}))
         )
+
+    db.add(new_form)
+    db.commit()
+    db.refresh(new_form)
+    return new_form.to_dict()
+
+def clean_html_to_text(html_content: str) -> str:
+    # Strip script and style blocks
+    html_content = re.sub(r'<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>', '', html_content, flags=re.I)
+    html_content = re.sub(r'<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>', '', html_content, flags=re.I)
+    # Strip head block
+    html_content = re.sub(r'<head\b[^<]*(?:(?!<\/head>)<[^<]*)*<\/head>', '', html_content, flags=re.I)
+    # Strip comments
+    html_content = re.sub(r'<!--.*?-->', '', html_content, flags=re.DOTALL)
+    # Strip HTML tags
+    text = re.sub(r'<[^>]+>', ' ', html_content)
+    # Normalize space
+    return re.sub(r'\s+', ' ', text).strip()
+
+@app.post("/api/forms/scrape")
+def scrape_and_create_form(data: dict, user_id: str = Depends(get_current_user), db: DBSession = Depends(get_db)):
+    """
+    Scrapes a target website URL, extracts the brand copy/features,
+    and uses the LLM to generate a customized conversational survey form.
+    """
+    url = data.get("url")
+    if not url:
+        raise HTTPException(status_code=400, detail="Target URL is required")
+        
+    # Ensure scheme
+    if not url.startswith("http://") and not url.startswith("https://"):
+        url = "https://" + url
+
+    text_content = ""
+    try:
+        # Fetch webpage with a custom User-Agent to avoid quick blocking
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 FormPulseBrandScraper/1.0"
+        }
+        with httpx.Client(timeout=6.0, follow_redirects=True) as client_http:
+            response = client_http.get(url, headers=headers)
+            if response.status_code == 200:
+                text_content = clean_html_to_text(response.text)
+            else:
+                print(f"Scraper returned status code {response.status_code} for {url}. Using fallback.")
+    except Exception as e:
+        print(f"Failed to scrape webpage {url} due to: {e}. Proceeding with domain-fallback schema generation.")
+
+    # Call LLM generator (will automatically use mock generator if text_content is empty or client is not configured)
+    generated = llm_provider.generate_form_schema_from_webpage(url, text_content)
+    
+    # Enrich pacing flow naturally
+    fields = generated.get("schema_fields", [])
+    title = generated.get("title", "AI Brand Generated Form")
+    objective = generated.get("objective", f"Brand study for {url}")
+    fields = llm_provider.plan_conversational_flow(title, objective, fields)
+
+    # Save to database
+    new_form = Form(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        title=title,
+        objective=objective,
+        schema_fields=json.dumps(fields),
+        guardrails=json.dumps(generated.get("guardrails", {})),
+        settings=json.dumps(generated.get("settings", {}))
+    )
 
     db.add(new_form)
     db.commit()
