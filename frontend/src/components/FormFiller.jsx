@@ -294,6 +294,7 @@ export default function FormFiller({ formId, standalone = true, onSessionUpdate 
         <div style={{ 
           padding: (bannerUrl || bannerGradient) ? '1.5rem 1.5rem 1rem 1.5rem' : '1rem', 
           paddingTop: (bannerUrl || bannerGradient) && logoUrl ? '1.75rem' : undefined,
+          borderTop: (!bannerUrl && !bannerGradient) ? '4px solid var(--accent-color)' : undefined,
           borderBottom: '1px solid var(--card-border)', 
           background: 'var(--card-bg)', 
           display: 'flex', 
@@ -343,41 +344,118 @@ export default function FormFiller({ formId, standalone = true, onSessionUpdate 
 
       {/* Chat Messages */}
       <div className="chat-messages-container" style={{ padding: '1.5rem' }}>
-        {messages.map((msg, index) => (
-          <div key={index} className={`chat-bubble ${msg.role}`}>
-            {msg.content}
-            {/* If it was a voice note user response, show audio identifier */}
-            {msg.role === 'user' && msg.content.includes('[Voice Note') && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem', fontSize: '0.8rem', opacity: 0.8 }}>
-                <Volume2 size={12} /> Voice Recording Ingested
+        {messages.map((msg, index) => {
+          const isAssistant = msg.role === 'assistant';
+          return (
+            <div key={index} style={{
+              display: 'flex',
+              gap: '0.6rem',
+              alignItems: 'flex-end',
+              alignSelf: isAssistant ? 'flex-start' : 'flex-end',
+              maxWidth: '85%',
+              width: 'auto'
+            }}>
+              {isAssistant && (
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  background: logoUrl ? 'transparent' : 'var(--accent-color)',
+                  border: logoUrl ? '1px solid var(--card-border)' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                  flexShrink: 0,
+                  color: '#ffffff',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  boxShadow: 'var(--shadow-sm)'
+                }}>
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  ) : (
+                    (companyName || formTitle).charAt(0).toUpperCase()
+                  )}
+                </div>
+              )}
+              
+              <div className={`chat-bubble ${msg.role}`} style={{ maxWidth: '100%', alignSelf: 'auto' }}>
+                {msg.content}
+                {/* If it was a voice note user response, show audio identifier */}
+                {msg.role === 'user' && msg.content.includes('[Voice Note') && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem', fontSize: '0.8rem', opacity: 0.8 }}>
+                    <Volume2 size={12} /> Voice Recording Ingested
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
         {isLoading && (
-          <div className="chat-bubble assistant" style={{ opacity: 0.65, display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
-            <span className="loader-dot" style={{ animation: 'bounce 0.6s infinite alternate' }}>•</span>
-            <span className="loader-dot" style={{ animation: 'bounce 0.6s infinite alternate 0.2s' }}>•</span>
-            <span className="loader-dot" style={{ animation: 'bounce 0.6s infinite alternate 0.4s' }}>•</span>
-            Thinking...
+          <div style={{
+            display: 'flex',
+            gap: '0.6rem',
+            alignItems: 'flex-end',
+            alignSelf: 'flex-start',
+            maxWidth: '85%',
+            width: 'auto'
+          }}>
+            <div style={{
+              width: '28px',
+              height: '28px',
+              borderRadius: '50%',
+              background: logoUrl ? 'transparent' : 'var(--accent-color)',
+              border: logoUrl ? '1px solid var(--card-border)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              flexShrink: 0,
+              color: '#ffffff',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              boxShadow: 'var(--shadow-sm)'
+            }}>
+              {logoUrl ? (
+                <img src={logoUrl} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              ) : (
+                (companyName || formTitle).charAt(0).toUpperCase()
+              )}
+            </div>
+            <div className="chat-bubble assistant" style={{ opacity: 0.65, display: 'flex', gap: '0.25rem', alignItems: 'center', maxWidth: '100%' }}>
+              <span className="loader-dot" style={{ animation: 'bounce 0.6s infinite alternate' }}>•</span>
+              <span className="loader-dot" style={{ animation: 'bounce 0.6s infinite alternate 0.2s' }}>•</span>
+              <span className="loader-dot" style={{ animation: 'bounce 0.6s infinite alternate 0.4s' }}>•</span>
+              Thinking...
+            </div>
           </div>
         )}
         {uploadingFile && (
-          <div className="chat-bubble user" style={{ 
-            opacity: 0.75, 
-            display: 'inline-flex', 
-            gap: '0.4rem', 
-            alignItems: 'center', 
-            alignSelf: 'flex-end', 
-            background: 'var(--card-bg)', 
-            border: '1px solid var(--card-border)', 
-            color: 'var(--text-primary)',
-            fontSize: '0.82rem',
-            padding: '0.5rem 1.25rem',
-            borderRadius: '12px 12px 0 12px'
+          <div style={{
+            display: 'flex',
+            gap: '0.6rem',
+            alignItems: 'flex-end',
+            alignSelf: 'flex-end',
+            maxWidth: '85%',
+            width: 'auto'
           }}>
-            <span className="loader-dot" style={{ animation: 'bounce 0.6s infinite alternate' }}>•</span>
-            Uploading attachment...
+            <div className="chat-bubble user" style={{ 
+              opacity: 0.75, 
+              display: 'inline-flex', 
+              gap: '0.4rem', 
+              alignItems: 'center', 
+              background: 'var(--card-bg)', 
+              border: '1px solid var(--card-border)', 
+              color: 'var(--text-primary)',
+              fontSize: '0.82rem',
+              padding: '0.5rem 1.25rem',
+              borderRadius: '12px 12px 0 12px',
+              maxWidth: '100%'
+            }}>
+              <span className="loader-dot" style={{ animation: 'bounce 0.6s infinite alternate' }}>•</span>
+              Uploading attachment...
+            </div>
           </div>
         )}
         <div ref={messagesEndRef} />
