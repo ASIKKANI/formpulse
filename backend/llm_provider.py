@@ -129,6 +129,16 @@ def _generate_mock_schema_from_prompt(prompt: str) -> dict:
             {"id": "improvement_notes", "label": "Suggestions for Improvement", "type": "text", "required": False, "description": "What changes would you like to see?", "pacing_question": "What specific improvements or changes would you like to suggest?"}
         ]
         
+    company = ""
+    if "stripe" in prompt_lower:
+        company = "Stripe"
+    elif "supabase" in prompt_lower:
+        company = "Supabase"
+    elif "firebase" in prompt_lower:
+        company = "Firebase"
+    elif "formpulse" in prompt_lower:
+        company = "FormPulse"
+
     return {
         "title": f"Survey: {prompt[:30].strip()}...",
         "objective": f"Assess parameters for: {prompt}",
@@ -140,7 +150,8 @@ def _generate_mock_schema_from_prompt(prompt: str) -> dict:
         "settings": {
             "allow_voice": True,
             "fatigue_threshold": 0.7,
-            "code_switching": True
+            "code_switching": True,
+            "company_name": company
         }
     }
 
@@ -212,7 +223,8 @@ def generate_form_schema(prompt: str) -> dict:
         "  \"settings\": {\n"
         "    \"allow_voice\": true,\n"
         "    \"fatigue_threshold\": 0.7,\n"
-        "    \"code_switching\": true\n"
+        "    \"code_switching\": true,\n"
+        "    \"company_name\": \"Extracted brand or company name if mentioned in user request (e.g. 'survey for Stripe' -> 'Stripe'), otherwise empty string\"\n"
         "  }\n"
         "}"
     )
@@ -269,7 +281,8 @@ def generate_form_schema_from_webpage(url: str, text_content: str, prompt: str =
         "  \"settings\": {\n"
         "    \"allow_voice\": true,\n"
         "    \"fatigue_threshold\": 0.7,\n"
-        "    \"code_switching\": true\n"
+        "    \"code_switching\": true,\n"
+        "    \"company_name\": \"Extracted brand or company name based on the URL and scraped text content\"\n"
         "  }\n"
         "}"
     )
@@ -393,7 +406,8 @@ def _generate_mock_schema_from_webpage(url: str, prompt: str = "") -> dict:
         "settings": {
             "allow_voice": True,
             "fatigue_threshold": 0.7,
-            "code_switching": True
+            "code_switching": True,
+            "company_name": name
         }
     }
 
@@ -498,8 +512,15 @@ def process_conversation_turn(form_dict: dict, history: list, extracted_so_far: 
     formatted_history.append(f"USER (LATEST): {latest_input}")
     chat_history_str = "\n".join(formatted_history)
 
+    settings = form_dict.get("settings", {})
+    company_name = settings.get("company_name", "") if isinstance(settings, dict) else ""
+    brand_clause = ""
+    if company_name:
+        brand_clause = f"You are conducting this survey on behalf of the company/brand: '{company_name}'. Maintain this context throughout. Acknowledge this company or their products naturally in your dialogue.\n\n"
+
     system_prompt = (
         "You are FormPulse, an objective-driven conversational survey bot. "
+        f"{brand_clause}"
         "Your goal is to conduct a survey and extract structured variables from a respondent's unstructured dialogue.\n\n"
         f"SURVEY OBJECTIVE:\n{form_dict['objective']}\n\n"
         f"GUARDRAILS & SYSTEM INSTRUCTIONS:\n{guardrails_desc}\n\n"
@@ -659,14 +680,25 @@ def generate_opening_question(form_dict: dict) -> str:
     first_field = fields[0] if fields else {"label": "general feedback", "description": "thoughts"}
     first_pacing = first_field.get("pacing_question", f"Could you share a bit about your {first_field.get('label', 'feedback')}?")
     
+    settings = form_dict.get("settings", {})
+    company_name = settings.get("company_name", "") if isinstance(settings, dict) else ""
+
     if not client:
-        return f"Hey there! Thanks for taking a moment to chat. To kick things off, {first_pacing[0].lower() + first_pacing[1:] if first_pacing else ''}"
+        first_clause = first_pacing[0].lower() + first_pacing[1:] if first_pacing else ''
+        if company_name:
+            return f"Hey there! Thanks for taking a moment to chat. I'm helping the team at {company_name} collect some feedback. To kick things off, {first_clause}"
+        return f"Hey there! Thanks for taking a moment to chat. To kick things off, {first_clause}"
         
     objective = form_dict.get("objective", "General feedback")
     
+    brand_clause = ""
+    if company_name:
+        brand_clause = f"The survey is being conducted on behalf of the company/brand: '{company_name}'. Introduce yourself as collecting feedback for '{company_name}' naturally.\n"
+
     system_prompt = (
         "You are FormPulse, a warm, highly casual B2B conversational researcher. "
         "Your job is to generate a welcoming, single-sentence greeting and opening question for a survey session.\n\n"
+        f"{brand_clause}"
         f"SURVEY OBJECTIVE: {objective}\n"
         f"FIRST TARGET FIELD PACING QUESTION: {first_pacing}\n\n"
         "INSTRUCTIONS:\n"

@@ -345,6 +345,20 @@ export default function AIWorkspace({ activeForm, selectForm, onNavigate, forms,
             <Settings2 size={18} className="kpi-icon" /> AI Survey Settings
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.35rem', fontWeight: 600 }}>
+                COMPANY / PROJECT NAME
+              </label>
+              <input 
+                type="text" 
+                className="input-field" 
+                placeholder="e.g. Stripe, Supabase, Acme Corp"
+                value={settings.company_name || ''} 
+                onChange={e => setSettings({ ...settings, company_name: e.target.value })} 
+                style={{ fontSize: '0.95rem' }}
+              />
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <strong style={{ display: 'block', fontSize: '0.9rem' }}>Allow Audio Voice Notes</strong>
