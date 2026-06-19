@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { 
   ArrowUp, ArrowDown, Plus, Trash2, Shield, 
   Settings2, Eye, Cpu, Database, Save,
-  Share2, Copy, Download, X, ExternalLink
+  Share2, Copy, Download, X, ExternalLink,
+  Palette, Upload, Image
 } from 'lucide-react';
 
 export default function AIWorkspace({ activeForm, selectForm, onNavigate, forms, setForms, authHeaders = {} }) {
@@ -33,6 +34,61 @@ export default function AIWorkspace({ activeForm, selectForm, onNavigate, forms,
   const [showShareModal, setShowShareModal] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedEmbed, setCopiedEmbed] = useState(false);
+
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/forms/upload', {
+        method: 'POST',
+        headers: authHeaders,
+        body: formData
+      });
+
+      if (!response.ok) throw new Error("Upload failed");
+      const data = await response.json();
+      setSettings(prev => ({ ...prev, logo_url: data.url }));
+    } catch (err) {
+      console.error("Logo upload error:", err);
+      alert("Failed to upload logo.");
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleBannerUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingBanner(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/forms/upload', {
+        method: 'POST',
+        headers: authHeaders,
+        body: formData
+      });
+
+      if (!response.ok) throw new Error("Upload failed");
+      const data = await response.json();
+      setSettings(prev => ({ ...prev, banner_url: data.url, banner_gradient: null }));
+    } catch (err) {
+      console.error("Banner upload error:", err);
+      alert("Failed to upload banner.");
+    } finally {
+      setUploadingBanner(false);
+    }
+  };
 
   const getShareLink = (formId) => {
     const origin = window.location.origin;
@@ -402,6 +458,191 @@ export default function AIWorkspace({ activeForm, selectForm, onNavigate, forms,
                 style={{ width: '100%', accentColor: 'var(--accent-color)' }}
               />
             </div>
+          </div>
+        </div>
+
+        {/* Custom Branding & Styling */}
+        <div className="card-container" style={{ marginBottom: '2rem' }}>
+          <h3 className="card-title" style={{ marginBottom: '1.25rem' }}>
+            <Palette size={18} className="kpi-icon" /> Custom Branding & Styling
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            
+            {/* Theme Accent Color */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem', fontWeight: 600 }}>
+                ACCENT THEME COLOR
+              </label>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                {[
+                  { name: "FormPulse Blue", hex: "#2563eb" },
+                  { name: "Supabase Green", hex: "#3ecf8e" },
+                  { name: "Stripe Purple", hex: "#635bff" },
+                  { name: "Tailwind Blue", hex: "#0ea5e9" },
+                  { name: "Tomato Red", hex: "#ef4444" },
+                  { name: "Vercel Black", hex: "#111111" }
+                ].map(c => (
+                  <button
+                    key={c.hex}
+                    type="button"
+                    onClick={() => setSettings({ ...settings, theme_color: c.hex })}
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      backgroundColor: c.hex,
+                      border: settings.theme_color === c.hex ? '3px solid var(--text-primary)' : '1px solid var(--card-border)',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    }}
+                    title={c.name}
+                  />
+                ))}
+                {/* Custom Color Input Wrapper */}
+                <div style={{
+                  position: 'relative',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  border: '1px solid var(--card-border)',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}>
+                  <input
+                    type="color"
+                    value={settings.theme_color || '#2563eb'}
+                    onChange={e => setSettings({ ...settings, theme_color: e.target.value })}
+                    style={{
+                      position: 'absolute',
+                      top: '-5px',
+                      left: '-5px',
+                      width: '42px',
+                      height: '42px',
+                      border: 'none',
+                      padding: 0,
+                      margin: 0,
+                      cursor: 'pointer',
+                      background: 'transparent'
+                    }}
+                    title="Custom Color"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Brand Logo Upload */}
+            <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '1rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem', fontWeight: 600 }}>
+                BRAND LOGO / AVATAR
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--card-border)',
+                  background: 'var(--bg-color)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden'
+                }}>
+                  {settings.logo_url ? (
+                    <img src={settings.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  ) : (
+                    <Image size={18} style={{ color: 'var(--text-muted)' }} />
+                  )}
+                </div>
+                <label className="button-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.8rem', padding: '0.5rem 0.8rem' }}>
+                  <Upload size={14} /> {uploadingLogo ? "Uploading..." : "Upload Logo"}
+                  <input type="file" onChange={handleLogoUpload} accept="image/*" style={{ display: 'none' }} disabled={uploadingLogo} />
+                </label>
+                {settings.logo_url && (
+                  <button type="button" className="button-icon" style={{ color: 'var(--error)', fontSize: '0.75rem' }} onClick={() => setSettings({ ...settings, logo_url: null })}>
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Form Banner Upload & Presets */}
+            <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '1rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem', fontWeight: 600 }}>
+                HEADER BANNER IMAGE
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {/* Banner Preview */}
+                <div style={{
+                  height: '80px',
+                  width: '100%',
+                  borderRadius: '8px',
+                  border: '1px solid var(--card-border)',
+                  overflow: 'hidden',
+                  background: settings.banner_url 
+                    ? `url(${settings.banner_url}) center/cover no-repeat` 
+                    : settings.banner_gradient || 'var(--card-bg)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {!settings.banner_url && !settings.banner_gradient && (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No Banner Configured</span>
+                  )}
+                </div>
+                
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <label className="button-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.8rem', padding: '0.5rem 0.8rem' }}>
+                    <Upload size={14} /> {uploadingBanner ? "Uploading..." : "Upload Banner"}
+                    <input type="file" onChange={handleBannerUpload} accept="image/*" style={{ display: 'none' }} disabled={uploadingBanner} />
+                  </label>
+                  {(settings.banner_url || settings.banner_gradient) && (
+                    <button type="button" className="button-icon" style={{ color: 'var(--error)', fontSize: '0.75rem' }} onClick={() => setSettings({ ...settings, banner_url: null, banner_gradient: null })}>
+                      Remove
+                    </button>
+                  )}
+                </div>
+
+                {/* Banner Presets */}
+                <div>
+                  <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Or choose a preset gradient banner:</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.35rem' }}>
+                    {[
+                      { name: "Ocean", css: "linear-gradient(135deg, #0ea5e9, #2563eb)" },
+                      { name: "Sunset", css: "linear-gradient(135deg, #f97316, #ef4444)" },
+                      { name: "Forest", css: "linear-gradient(135deg, #10b981, #047857)" },
+                      { name: "Indigo", css: "linear-gradient(135deg, #6366f1, #4f46e5)" },
+                      { name: "Dark", css: "linear-gradient(135deg, #1f2937, #111827)" },
+                      { name: "Pulse", css: "linear-gradient(135deg, #2563eb, #1d4ed8)" }
+                    ].map(p => (
+                      <button
+                        key={p.name}
+                        type="button"
+                        onClick={() => setSettings({ ...settings, banner_gradient: p.css, banner_url: null })}
+                        style={{
+                          height: '24px',
+                          borderRadius: '4px',
+                          background: p.css,
+                          border: settings.banner_gradient === p.css ? '2px solid var(--text-primary)' : '1px solid rgba(255,255,255,0.1)',
+                          cursor: 'pointer',
+                          fontSize: '0.65rem',
+                          color: '#fff',
+                          fontWeight: 700,
+                          textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        {p.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
           </div>
         </div>
       </div>

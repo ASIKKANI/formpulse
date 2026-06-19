@@ -493,6 +493,10 @@ def start_session(data: dict, db: DBSession = Depends(get_db)):
     
     session_data = new_session.to_dict()
     session_data["active_field"] = get_active_field(form_dict, {})
+    session_data["form"] = {
+        "title": form.title,
+        "settings": form_dict["settings"]
+    }
     return session_data
 
 @app.post("/api/sessions/{session_id}/upload")
@@ -559,12 +563,79 @@ async def upload_file(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Local storage fallback failed: {e}")
 
+@app.post("/api/forms/upload")
+async def upload_form_asset(
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user),
+    db: DBSession = Depends(get_db)
+):
+    """
+    Handles logo and banner uploads for form configuration.
+    Saves to platform owner's central Supabase Storage first, then falls back to local disk.
+    """
+    supabase_url = os.getenv("SUPABASE_URL", "")
+    supabase_anon_key = os.getenv("SUPABASE_ANON_KEY", "")
+
+    # Sanitize and format filename
+    raw_filename = file.filename or "asset"
+    filename_parts = raw_filename.split(".")
+    ext = filename_parts[-1].lower() if len(filename_parts) > 1 else "bin"
+    
+    unique_id = uuid.uuid4().hex[:8]
+    safe_filename = f"creator_{user_id}_{unique_id}.{ext}"
+    safe_filename = re.sub(r"[^a-zA-Z0-9_.-]", "_", safe_filename)
+
+    # 1. Supabase Storage
+    if supabase_url and supabase_anon_key:
+        try:
+            url = supabase_url.rstrip("/")
+            bucket = "formpulse-uploads"
+            upload_url = f"{url}/storage/v1/object/{bucket}/assets/{user_id}/{safe_filename}"
+
+            headers = {
+                "Authorization": f"Bearer {supabase_anon_key}",
+                "ApiKey": supabase_anon_key,
+                "Content-Type": file.content_type or "application/octet-stream"
+            }
+
+            file_content = await file.read()
+            async with httpx.AsyncClient() as client_http:
+                response = await client_http.post(upload_url, content=file_content, headers=headers, timeout=20.0)
+                if response.status_code == 200:
+                    public_url = f"{url}/storage/v1/object/public/{bucket}/assets/{user_id}/{safe_filename}"
+                    return {"url": public_url}
+                else:
+                    print(f"Supabase asset upload failed with status {response.status_code}: {response.text}")
+        except Exception as e:
+            print(f"Failed uploading asset to Supabase: {e}")
+
+    # 2. Local fallback
+    try:
+        local_path = os.path.join("uploads", safe_filename)
+        await file.seek(0)
+        with open(local_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        return {"url": f"/api/uploads/{safe_filename}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Local asset storage fallback failed: {e}")
+
 @app.get("/api/sessions/{session_id}")
 def get_session(session_id: str, db: DBSession = Depends(get_db)):
     session = db.query(SurveySession).filter(SurveySession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    return session.to_dict()
+    
+    form = db.query(Form).filter(Form.id == session.form_id).first()
+    session_data = session.to_dict()
+    if form:
+        form_dict = form.to_dict()
+        session_data["active_field"] = get_active_field(form_dict, json.loads(session.extracted_data))
+        session_data["form"] = {
+            "title": form.title,
+            "settings": form_dict["settings"]
+        }
+    return session_data
 
 @app.post("/api/sessions/{session_id}/respond")
 async def respond_to_survey(
@@ -726,6 +797,10 @@ async def respond_to_survey(
 
     session_data = survey_session.to_dict()
     session_data["active_field"] = get_active_field(form_dict, json.loads(survey_session.extracted_data))
+    session_data["form"] = {
+        "title": form.title,
+        "settings": form_dict["settings"]
+    }
 
     return {
         "session": session_data,

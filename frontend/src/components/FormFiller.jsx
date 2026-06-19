@@ -232,18 +232,111 @@ export default function FormFiller({ formId, standalone = true, onSessionUpdate 
 
   const isCompleted = session?.status === 'completed';
 
+  const formTitle = session?.form?.title || 'FormPulse Collector';
+  const formSettings = session?.form?.settings || {};
+  const companyName = formSettings?.company_name || '';
+  const themeColor = formSettings?.theme_color || '';
+  const logoUrl = formSettings?.logo_url;
+  const bannerUrl = formSettings?.banner_url;
+  const bannerGradient = formSettings?.banner_gradient;
+
+  const styleOverride = themeColor ? {
+    '--accent-color': themeColor,
+    '--accent-hover': `${themeColor}cc`,
+    '--accent-glow': `${themeColor}1a`
+  } : {};
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', background: 'inherit' }}>
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      height: '100%', 
+      width: '100%', 
+      background: 'inherit',
+      ...styleOverride
+    }}>
       
+      {/* Banner Header Container */}
+      {(bannerUrl || bannerGradient) && (
+        <div style={{
+          height: '120px',
+          width: '100%',
+          background: bannerUrl ? `url(${bannerUrl}) center/cover no-repeat` : bannerGradient,
+          borderBottom: '1px solid var(--card-border)',
+          position: 'relative'
+        }}>
+          {/* Floating Logo Overlay */}
+          {logoUrl && (
+            <div style={{
+              position: 'absolute',
+              bottom: '-20px',
+              left: '1.5rem',
+              width: '54px',
+              height: '54px',
+              borderRadius: '12px',
+              background: 'var(--card-bg)',
+              border: '3px solid var(--card-bg)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              zIndex: 10
+            }}>
+              <img src={logoUrl} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Standalone Header */}
       {standalone && (
-        <div style={{ padding: '1rem', borderBottom: '1px solid var(--card-border)', background: 'var(--card-bg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>FormPulse Collector</h3>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Conversational survey session</span>
+        <div style={{ 
+          padding: (bannerUrl || bannerGradient) ? '1.5rem 1.5rem 1rem 1.5rem' : '1rem', 
+          paddingTop: (bannerUrl || bannerGradient) && logoUrl ? '1.75rem' : undefined,
+          borderBottom: '1px solid var(--card-border)', 
+          background: 'var(--card-bg)', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          position: 'relative'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {/* If no banner, render logo inline next to title */}
+            {!bannerUrl && !bannerGradient && logoUrl && (
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                background: 'var(--bg-color)',
+                border: '1px solid var(--card-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden'
+              }}>
+                <img src={logoUrl} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              </div>
+            )}
+            
+            <div style={{ paddingLeft: (bannerUrl || bannerGradient) && logoUrl ? '4.5rem' : '0' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                {formTitle}
+              </h3>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {companyName ? `Conversational survey for ${companyName}` : "Conversational survey session"}
+              </span>
+            </div>
           </div>
-          <span className="share-url" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
-            {isCompleted ? "Session Done" : "Live Chat"}
+          <span className="share-url" style={{ 
+            fontSize: '0.7rem', 
+            padding: '0.25rem 0.6rem', 
+            borderRadius: '12px',
+            background: 'rgba(37, 99, 235, 0.08)',
+            color: 'var(--accent-color)',
+            fontWeight: 600
+          }}>
+            {isCompleted ? "Completed" : "Live Survey"}
           </span>
         </div>
       )}
