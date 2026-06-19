@@ -47,9 +47,13 @@ export default function AIWorkspace({ activeForm, selectForm, onNavigate, forms,
       const formData = new FormData();
       formData.append('file', file);
 
+      const uploadHeaders = { ...authHeaders };
+      delete uploadHeaders['Content-Type'];
+      delete uploadHeaders['content-type'];
+
       const response = await fetch('/api/forms/upload', {
         method: 'POST',
-        headers: authHeaders,
+        headers: uploadHeaders,
         body: formData
       });
 
@@ -73,9 +77,13 @@ export default function AIWorkspace({ activeForm, selectForm, onNavigate, forms,
       const formData = new FormData();
       formData.append('file', file);
 
+      const uploadHeaders = { ...authHeaders };
+      delete uploadHeaders['Content-Type'];
+      delete uploadHeaders['content-type'];
+
       const response = await fetch('/api/forms/upload', {
         method: 'POST',
-        headers: authHeaders,
+        headers: uploadHeaders,
         body: formData
       });
 
