@@ -34,3 +34,8 @@ uploads/
 *.log
 
 .vercel
+# Third-party Services
+OpenWA/
+
+# Vector DB
+backend/chroma_db/

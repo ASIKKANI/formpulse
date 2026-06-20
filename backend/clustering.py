@@ -1,7 +1,11 @@
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.cluster import KMeans
+    from sklearn.decomposition import PCA
+    HAS_SKLEARN = True
+except ImportError:
+    HAS_SKLEARN = False
 
 def analyze_and_cluster_responses(responses: list) -> dict:
     """
@@ -56,6 +60,9 @@ def analyze_and_cluster_responses(responses: list) -> dict:
     valid_ids = [ids[i] for i in valid_indices]
 
     try:
+        if not HAS_SKLEARN:
+            raise ImportError("scikit-learn is not installed. Falling back to heuristic/mock clustering.")
+
         # 1. Vectorize text using TF-IDF with custom n-gram parameters
         vectorizer = TfidfVectorizer(
             stop_words='english', 

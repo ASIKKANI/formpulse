@@ -98,6 +98,35 @@ export default function AIWorkspace({ activeForm, selectForm, onNavigate, forms,
     }
   };
 
+  // RAG Document states
+  const [ragFile, setRagFile] = useState(null);
+  const [isUploadingRag, setIsUploadingRag] = useState(false);
+
+  const handleUploadKnowledgeDocument = async (e) => {
+    e.preventDefault();
+    if (!ragFile) return;
+    setIsUploadingRag(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', ragFile);
+      const uploadRes = await fetch(`/api/forms/${activeForm.id}/upload_document`, {
+        method: 'POST',
+        headers: { Authorization: authHeaders.Authorization },
+        body: formData
+      });
+      if (!uploadRes.ok) throw new Error("Failed to upload/index document");
+      alert("Document indexed successfully! Form is now Knowledge Base aware.");
+      setSettings(prev => ({ ...prev, has_knowledge_base: true }));
+      setRagFile(null);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to upload RAG document: ' + err.message);
+    } finally {
+      setIsUploadingRag(false);
+    }
+  };
+
+
   const getShareLink = (formId) => {
     const origin = window.location.origin;
     return `${origin}/fill?id=${formId}`;
@@ -400,6 +429,39 @@ export default function AIWorkspace({ activeForm, selectForm, onNavigate, forms,
                 )}
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Knowledge Base Integration */}
+        <div className="card-container" style={{ marginBottom: '2rem' }}>
+          <h3 className="card-title" style={{ marginBottom: '1.25rem' }}>
+            <Database size={18} className="kpi-icon" /> Knowledge Base Integration
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {settings.has_knowledge_base ? (
+              <div style={{ padding: '1rem', background: 'rgba(52, 211, 153, 0.1)', border: '1px solid var(--success)', borderRadius: '8px', color: 'var(--success)' }}>
+                <strong style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>✓ Knowledge Base Active</strong>
+                <span style={{ fontSize: '0.8rem' }}>A document is indexed and attached to this form. The AI will use it as context.</span>
+              </div>
+            ) : (
+              <form onSubmit={handleUploadKnowledgeDocument} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Upload an Image or PDF document to give the AI context about this form.
+                </label>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input 
+                    type="file" 
+                    className="input-field" 
+                    onChange={e => setRagFile(e.target.files[0])}
+                    accept="image/*,.pdf"
+                    style={{ flex: 1, height: '38px' }}
+                  />
+                  <button type="submit" className="button-primary" disabled={isUploadingRag || !ragFile} style={{ height: '38px', padding: '0 1rem' }}>
+                    {isUploadingRag ? "Indexing..." : "Upload & Index"}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
 
@@ -783,6 +845,32 @@ export default function AIWorkspace({ activeForm, selectForm, onNavigate, forms,
                   </button>
                   <a 
                     href={getShareLink(activeForm.id)} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="button-secondary" 
+                    style={{ padding: '0.6rem 1rem' }}
+                  >
+                    <ExternalLink size={16} />
+                  </a>
+                </div>
+              </div>
+
+              {/* WhatsApp Share URL */}
+              <div style={{ width: '100%' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.35rem', fontWeight: 600 }}>
+                  WhatsApp Native Survey Link (Picky Assist)
+                </label>
+                <div className="share-url-container">
+                  <div className="share-url">{`https://api.whatsapp.com/send?text=${encodeURIComponent('start_survey_' + activeForm.id)}`}</div>
+                  <button 
+                    className="button-primary" 
+                    style={{ padding: '0.6rem 1rem' }}
+                    onClick={() => copyToClipboard(`https://api.whatsapp.com/send?text=${encodeURIComponent('start_survey_' + activeForm.id)}`, 'link')}
+                  >
+                    {copiedLink ? "Copied!" : <Copy size={16} />}
+                  </button>
+                  <a 
+                    href={`https://api.whatsapp.com/send?text=${encodeURIComponent('start_survey_' + activeForm.id)}`} 
                     target="_blank" 
                     rel="noreferrer"
                     className="button-secondary" 

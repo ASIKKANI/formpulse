@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Mic, Square, Volume2, AlertCircle, RefreshCw, Paperclip } from 'lucide-react';
+import { Send, Mic, Square, Volume2, AlertCircle, RefreshCw, Paperclip, VolumeX } from 'lucide-react';
 
 export default function FormFiller({ formId, standalone = true, onSessionUpdate = null }) {
   const [session, setSession] = useState(null);
@@ -8,6 +8,9 @@ export default function FormFiller({ formId, standalone = true, onSessionUpdate 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   
+  // Voice agent state
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
+
   // Audio recording state
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
@@ -61,6 +64,34 @@ export default function FormFiller({ formId, standalone = true, onSessionUpdate 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Voice Agent Auto-Speak
+  useEffect(() => {
+    if (!isVoiceMode || messages.length === 0) return;
+    
+    const lastMessage = messages[messages.length - 1];
+    const isCompleted = session?.status === 'completed';
+    
+    if (lastMessage.role === 'assistant' && !isLoading) {
+      window.speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(lastMessage.content);
+      utterance.onend = () => {
+        if (isVoiceMode && !isCompleted && !isRecording) {
+          startRecording();
+        }
+      };
+      
+      window.speechSynthesis.speak(utterance);
+    }
+  }, [messages, isVoiceMode, isLoading, session]);
+
+  // Cleanup speech on unmount
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, []);
 
   // Audio timer ticker
   useEffect(() => {
@@ -540,6 +571,35 @@ export default function FormFiller({ formId, standalone = true, onSessionUpdate 
                 style={{ borderRadius: '20px', padding: '0.5rem 1.25rem' }}
               />
             )}
+
+            {/* Voice Mode Toggle */}
+            <button
+              type="button"
+              className={`button-icon ${isVoiceMode ? 'active' : ''}`}
+              onClick={() => {
+                const newMode = !isVoiceMode;
+                setIsVoiceMode(newMode);
+                if (!newMode) {
+                  window.speechSynthesis.cancel();
+                  stopRecording();
+                }
+              }}
+              title={isVoiceMode ? "Disable Voice Agent" : "Enable Voice Agent"}
+              style={{ 
+                color: isVoiceMode ? 'white' : 'var(--text-muted)',
+                backgroundColor: isVoiceMode ? '#10b981' : 'transparent',
+                border: isVoiceMode ? 'none' : '1px solid var(--card-border)',
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              {isVoiceMode ? <Volume2 size={18} /> : <VolumeX size={18} />}
+            </button>
 
             {/* Mic / Record button */}
             {!inputText.trim() && (

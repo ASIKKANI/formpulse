@@ -18,6 +18,9 @@ import re
 from database import SessionLocal, Form, Session as SurveySession, Response, init_db
 import llm_provider
 import clustering
+import ocr_provider
+import rag_pipeline
+import whatsapp_provider
 
 # Create backend directories
 os.makedirs("uploads", exist_ok=True)
@@ -444,6 +447,40 @@ def delete_form(form_id: str, user_id: str = Depends(get_current_user), db: DBSe
     db.commit()
     return {"message": "Form deleted successfully"}
 
+@app.post("/api/forms/{form_id}/upload_document")
+def upload_knowledge_document(
+    form_id: str,
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user),
+    db: DBSession = Depends(get_db)
+):
+    form = db.query(Form).filter(Form.id == form_id, Form.user_id == user_id).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+
+    ext = file.filename.split(".")[-1]
+    temp_filename = f"uploads/{uuid.uuid4().hex}.{ext}"
+    with open(temp_filename, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    try:
+        markdown_text = ocr_provider.parse_document(temp_filename)
+        rag_pipeline.index_document(form_id, markdown_text)
+        
+        settings = json.loads(form.settings)
+        settings["has_knowledge_base"] = True
+        form.settings = json.dumps(settings)
+        db.commit()
+        
+        return {"message": "Document uploaded and indexed successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        try:
+            os.remove(temp_filename)
+        except:
+            pass
+
 # -----------------
 # 3. RESPONDENT SURVEY SESSIONS
 # -----------------
@@ -711,9 +748,12 @@ async def respond_to_survey(
     if file_url and file_field_id:
         extracted[file_field_id] = file_url
         survey_session.extracted_data = json.dumps(extracted)
+    knowledge_context = ""
+    if form_dict.get("settings", {}).get("has_knowledge_base"):
+        knowledge_context = rag_pipeline.query_document(form.id, user_input)
 
     # Process Turn with LLM
-    result = llm_provider.process_conversation_turn(form_dict, history, extracted, user_input)
+    result = llm_provider.process_conversation_turn(form_dict, history, extracted, user_input, knowledge_context)
 
     # Calculate fatigue based on pacing/message details (Heuristic + LLM)
     input_length = len(user_input.split())
@@ -1015,6 +1055,149 @@ def chat_with_cohort(form_id: str, data: dict, user_id: str = Depends(get_curren
     except Exception as e:
         print(f"Error querying cohort chat: {e}")
         return {"message": f"[Error: {e}]"}
+
+# -----------------
+# 6. WHATSAPP WEBHOOK ROUTER (PICKY ASSIST)
+# -----------------
+import urllib.parse
+
+@app.post("/api/webhooks/whatsapp")
+async def whatsapp_webhook(payload: dict, db: DBSession = Depends(get_db)):
+    """
+    Receives incoming messages from WhatsApp via OpenWA Gateway.
+    Routes to the correct SurveySession or initiates a new one via deep link.
+    """
+    print(f"--- INCOMING OPENWA WEBHOOK ---\n{payload}\n-------------------------------------")
+    try:
+        # OpenWA payload format
+        data = payload.get("data", {})
+        from_number = data.get("from", "")
+        if not from_number:
+            return {"status": "ignored", "reason": "no_number"}
+
+        number = from_number.replace("@c.us", "")
+        user_message = data.get("body", "").strip()
+
+        # Is this an initialization deep link? (e.g. "start_survey_xxx")
+        if "start_survey_" in user_message.lower():
+            # Extract form_id
+            parts = user_message.lower().split("start_survey_")
+            if len(parts) > 1:
+                form_id = parts[1].strip().split()[0] # get the id part
+                form = db.query(Form).filter(Form.id == form_id).first()
+                if form:
+                    # Create a new session. Encode the number in the ID to avoid schema migrations.
+                    session_id = f"wa_{number}_{uuid.uuid4().hex}"
+                    form_dict = {
+                        "id": form.id,
+                        "title": form.title,
+                        "objective": form.objective,
+                        "schema_fields": json.loads(form.schema_fields),
+                        "guardrails": json.loads(form.guardrails) if form.guardrails else {},
+                        "settings": json.loads(form.settings) if form.settings else {}
+                    }
+                    new_session = SurveySession(
+                        id=session_id,
+                        form_id=form_id,
+                        status="active",
+                        conversation_history=json.dumps([]),
+                        extracted_data=json.dumps({}),
+                        fatigue_index=0.0
+                    )
+                    db.add(new_session)
+                    
+                    # Generate opening question
+                    opening_msg = llm_provider.generate_opening_question(form_dict)
+                    
+                    # Save history
+                    history = [{"role": "assistant", "content": opening_msg}]
+                    new_session.conversation_history = json.dumps(history)
+                    db.commit()
+
+                    # Send the opening message via WhatsApp
+                    whatsapp_provider.send_whatsapp_message(number, opening_msg)
+                    return {"status": "success", "action": "started_survey"}
+                else:
+                    whatsapp_provider.send_whatsapp_message(number, "Sorry, I couldn't find that survey. It might have been deleted.")
+                    return {"status": "error", "reason": "form_not_found"}
+
+        # If not an initiation, check if this number has an active survey session
+        # We query for the most recent active session containing this number in the ID
+        active_session = db.query(SurveySession).filter(
+            SurveySession.id.like(f"wa_{number}_%"),
+            SurveySession.status == "active"
+        ).order_by(SurveySession.created_at.desc()).first()
+
+        if not active_session:
+            # They just sent a random message without starting a survey
+            whatsapp_provider.send_whatsapp_message(number, "Hello! You don't have any active surveys. Please click a survey link to begin.")
+            return {"status": "ignored", "reason": "no_active_session"}
+
+        # Process the conversation turn
+        form = db.query(Form).filter(Form.id == active_session.form_id).first()
+        form_dict = {
+            "id": form.id,
+            "title": form.title,
+            "objective": form.objective,
+            "schema_fields": json.loads(form.schema_fields),
+            "guardrails": json.loads(form.guardrails) if form.guardrails else {},
+            "settings": json.loads(form.settings) if form.settings else {}
+        }
+
+        history = json.loads(active_session.conversation_history)
+        extracted = json.loads(active_session.extracted_data)
+
+        # Handle Knowledge Base RAG
+        knowledge_context = ""
+        if form_dict.get("settings", {}).get("has_knowledge_base"):
+            knowledge_context = rag_pipeline.query_document(form.id, user_message)
+
+        # Call LLM
+        result = llm_provider.process_conversation_turn(form_dict, history, extracted, user_message, knowledge_context)
+
+        # Update Fatigue
+        input_length = len(user_message.split())
+        fatigue_delta = 0.05
+        if input_length < 3: fatigue_delta = 0.15
+        if result.get("fatigue_rating") == "medium": fatigue_delta = 0.2
+        elif result.get("fatigue_rating") == "high": fatigue_delta = 0.4
+        
+        new_fatigue = min(1.0, active_session.fatigue_index + fatigue_delta)
+        
+        # Save State
+        history.append({"role": "user", "content": user_message})
+        history.append({"role": "assistant", "content": result["next_message"]})
+        
+        active_session.conversation_history = json.dumps(history)
+        active_session.extracted_data = json.dumps(result["extracted_data"])
+        active_session.fatigue_index = new_fatigue
+        
+        if result.get("form_complete"):
+            active_session.status = "completed"
+            
+            # Save Final Response Row
+            final_response = Response(
+                id=uuid.uuid4().hex,
+                form_id=form.id,
+                session_id=active_session.id,
+                extracted_data=active_session.extracted_data,
+                conversation_transcript=active_session.conversation_history,
+                fatigue_score=active_session.fatigue_index
+            )
+            db.add(final_response)
+
+        db.commit()
+
+        # Send response back to user
+        whatsapp_provider.send_whatsapp_message(number, result["next_message"])
+
+        return {"status": "success", "action": "processed_turn"}
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"Webhook Error: {e}")
+        return {"status": "error", "reason": str(e)}
 
 if __name__ == "__main__":
     import uvicorn

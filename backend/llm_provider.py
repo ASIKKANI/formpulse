@@ -487,7 +487,7 @@ def plan_conversational_flow(title: str, objective: str, fields: list) -> list:
             enriched_fields.append(field_copy)
         return enriched_fields
 
-def process_conversation_turn(form_dict: dict, history: list, extracted_so_far: dict, latest_input: str) -> dict:
+def process_conversation_turn(form_dict: dict, history: list, extracted_so_far: dict, latest_input: str, knowledge_context: str = "") -> dict:
     """
     Core conversational survey loop turn.
     Sends conversation + target schema to Groq.
@@ -498,7 +498,7 @@ def process_conversation_turn(form_dict: dict, history: list, extracted_so_far: 
       - form_complete: boolean indicating if survey objective is met or user is exhausted.
     """
     if not client:
-        return _mock_conversation_turn(form_dict, history, extracted_so_far, latest_input)
+        return _mock_conversation_turn(form_dict, history, extracted_so_far, latest_input, knowledge_context)
 
     # Compile the prompt including target schema, current state, and guardrails
     fields_desc = json.dumps(form_dict["schema_fields"], indent=2)
@@ -526,6 +526,13 @@ def process_conversation_turn(form_dict: dict, history: list, extracted_so_far: 
         f"GUARDRAILS & SYSTEM INSTRUCTIONS:\n{guardrails_desc}\n\n"
         f"TARGET SCHEMA FIELDS:\n{fields_desc}\n\n"
         f"EXTRACTED DATA SO FAR:\n{state_desc}\n\n"
+    )
+    
+    if knowledge_context:
+        system_prompt += f"RELEVANT KNOWLEDGE BASE CONTEXT:\n{knowledge_context}\n\n"
+        system_prompt += "You have access to the above Knowledge Base. Use it to answer the user's questions if relevant.\n\n"
+        
+    system_prompt += (
         "YOUR INSTRUCTIONS:\n"
         "1. Read the chat history and the LATEST USER INPUT.\n"
         "2. Parse the input to extract any new values matching the TARGET SCHEMA. "
@@ -534,7 +541,7 @@ def process_conversation_turn(form_dict: dict, history: list, extracted_so_far: 
         "4. Determine if the FORM IS COMPLETE. The form is complete if: all required fields are filled, OR the user displays high fatigue, OR you have sufficiently satisfied the qualitative objectives.\n"
         "5. Formulate your NEXT MESSAGE:\n"
         "  - Talk like a very warm, casual, and empathetic human researcher on WhatsApp or Slack. Do NOT sound like a robotic questionnaire or a cold interviewer.\n"
-        "  - Handle User Questions/Clarifications: If the user asks a question, requests clarification (e.g. 'Why do you ask that?', 'What do you mean by pricing?', etc.), or seeks information about the context, you MUST answer their question directly, clearly, and concisely. Provide a helpful response using the context of the SURVEY OBJECTIVE. Once answered, gently transition back to the survey (e.g. 'Hope that clarifies! To continue...', 'Does that make sense? So, ...') before asking the pacing question.\n"
+        "  - Handle User Questions/Clarifications: If the user asks a question, requests clarification, or asks about the uploaded document, you MUST answer their question directly, clearly, and concisely. Provide a helpful response using the RELEVANT KNOWLEDGE BASE CONTEXT provided above. If the context does not contain the answer, politely inform them. Once answered, gently transition back to the survey (e.g. 'Hope that clarifies! To continue...') before asking the pacing question.\n"
         "  - Use Active Listening: Always validate and acknowledge their input before moving on (e.g. 'Oh wow, database lag is the absolute worst' or 'Aha, pricing is a huge factor, I get that').\n"
         "  - Use Psychological Engagement: Formulate questions open-endedly and casually to make the user feel comfortable sharing more detail.\n"
         "  - For target fields that are not yet extracted, look up their pre-planned 'pacing_question' property in the TARGET SCHEMA FIELDS. You MUST adapt and use this casual 'pacing_question' to prompt the user for that field, rather than asking for the raw label directly. This is crucial to maintain flow.\n"
@@ -563,7 +570,7 @@ def process_conversation_turn(form_dict: dict, history: list, extracted_so_far: 
         return result
     except Exception as e:
         print(f"Error calling Groq for chat turn: {e}")
-        return _mock_conversation_turn(form_dict, history, extracted_so_far, latest_input)
+        return _mock_conversation_turn(form_dict, history, extracted_so_far, latest_input, knowledge_context)
 
 def transcribe_audio(audio_file_path: str) -> str:
     """
@@ -584,7 +591,7 @@ def transcribe_audio(audio_file_path: str) -> str:
         print(f"Error transcribing audio: {e}")
         return f"[Audio Transcription Error: {e}]"
 
-def _mock_conversation_turn(form_dict: dict, history: list, extracted_so_far: dict, latest_input: str) -> dict:
+def _mock_conversation_turn(form_dict: dict, history: list, extracted_so_far: dict, latest_input: str, knowledge_context: str = "") -> dict:
     """
     Local mock fallback for when GROQ_API_KEY is not set.
     Directly loops through the target fields to simulate a conversation.
