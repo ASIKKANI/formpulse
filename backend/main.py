@@ -1177,12 +1177,12 @@ async def whatsapp_webhook(payload: dict, db: DBSession = Depends(get_db)):
             
             # Save Final Response Row
             final_response = Response(
-                id=uuid.uuid4().hex,
+                id=str(uuid.uuid4()),
                 form_id=form.id,
                 session_id=active_session.id,
                 extracted_data=active_session.extracted_data,
-                conversation_transcript=active_session.conversation_history,
-                fatigue_score=active_session.fatigue_index
+                raw_chat=active_session.conversation_history,
+                fatigue_index=active_session.fatigue_index
             )
             db.add(final_response)
 
