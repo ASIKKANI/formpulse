@@ -542,9 +542,11 @@ def process_conversation_turn(form_dict: dict, history: list, extracted_so_far: 
         "5. Formulate your NEXT MESSAGE:\n"
         "  - Talk like a very warm, casual, and empathetic human researcher on WhatsApp or Slack. Do NOT sound like a robotic questionnaire or a cold interviewer.\n"
         "  - Handle User Questions/Clarifications: If the user asks a question, requests clarification, or asks about the uploaded document, you MUST answer their question directly, clearly, and concisely. Provide a helpful response using the RELEVANT KNOWLEDGE BASE CONTEXT provided above. If the context does not contain the answer, politely inform them. Once answered, gently transition back to the survey (e.g. 'Hope that clarifies! To continue...') before asking the pacing question.\n"
-        "  - Use Active Listening: Always validate and acknowledge their input before moving on (e.g. 'Oh wow, database lag is the absolute worst' or 'Aha, pricing is a huge factor, I get that').\n"
+        "  - Use Empathetic Active Listening: Validate and acknowledge the user's input with brief conversational anchors, micro-expressions, or sentiment-based validation (e.g., 'I hear you, database setups are always tricky!' or 'Oh wow, database lag is the absolute worst'). Keep these validation anchors extremely short (one brief clause) so the conversation moves forward quickly without dragging.\n"
+        "  - Use Dynamic Probing: If the user's answer to the active target field is too brief, vague, or mentions a major pain point (like a bug, database issue, or pricing friction) without any context, do NOT immediately move to the next field. Instead, ask exactly ONE spontaneous, brief follow-up question to probe for details (e.g., 'Oh no, where did you notice the lag most—during file uploads or loading the dashboard?').\n"
+        "  - Avoid Dragging (ONE Follow-up Limit): Under NO circumstances ask more than ONE follow-up question for any single field. If the user has already responded to a follow-up sub-question (check the chat history to see if the last assistant message was a follow-up sub-question on the current field) or if they remain brief a second time, immediately extract whatever value you can and transition gracefully back to the main survey schema by asking the next field's pacing question. Do not badger the user or drag the topic further.\n"
         "  - Use Psychological Engagement: Formulate questions open-endedly and casually to make the user feel comfortable sharing more detail.\n"
-        "  - For target fields that are not yet extracted, look up their pre-planned 'pacing_question' property in the TARGET SCHEMA FIELDS. You MUST adapt and use this casual 'pacing_question' to prompt the user for that field, rather than asking for the raw label directly. This is crucial to maintain flow.\n"
+        "  - Transitioning Fields: When the current field is sufficiently answered, move to the next unextracted target field. Look up its pre-planned 'pacing_question' property in the TARGET SCHEMA FIELDS and adapt this casual 'pacing_question' to prompt the user, rather than asking for the raw label directly. This is crucial to maintain flow.\n"
         "  - Keep sentences short, neat, and highly natural. Do NOT ask leading questions. Remain completely unbiased.\n"
         "  - If the form is complete (form_complete is true), politely wrap up the conversation and thank them. Under NO circumstances ask any further questions or end the message with a question mark.\n"
         "6. Respond ONLY in a JSON object with this format:\n"
@@ -594,13 +596,11 @@ def transcribe_audio(audio_file_path: str) -> str:
 def _mock_conversation_turn(form_dict: dict, history: list, extracted_so_far: dict, latest_input: str, knowledge_context: str = "") -> dict:
     """
     Local mock fallback for when GROQ_API_KEY is not set.
-    Directly loops through the target fields to simulate a conversation.
+    Directly loops through the target fields to simulate a conversation with Empathetic Active Listening and Dynamic Probing.
     """
-    # Simple mock logic
     fields = form_dict["schema_fields"]
     new_extracted = dict(extracted_so_far)
 
-    # Guess extraction from latest_input
     # Find the first field that isn't extracted yet
     current_field = None
     for f in fields:
@@ -608,16 +608,58 @@ def _mock_conversation_turn(form_dict: dict, history: list, extracted_so_far: di
             current_field = f
             break
 
-    # Mock extract if we had a current field
+    # Determine if we should do a mock dynamic probe for the current field
+    is_probe_turn = False
+    validation = "Got it, thanks. "
+    probe_question = ""
+    
     if current_field and latest_input:
-        val = latest_input.strip()
-        # Parse basic types
-        if current_field["type"] == "number":
-            try:
-                val = int(val)
-            except ValueError:
-                pass
-        new_extracted[current_field["id"]] = val
+        cleaned_in = latest_input.strip().lower()
+        
+        # Check if the last assistant message in history was already a probe follow-up for this field
+        already_probed = False
+        last_assistant_msg = ""
+        for msg in reversed(history):
+            if msg.get("role") == "assistant":
+                last_assistant_msg = msg.get("content", "")
+                break
+        
+        if last_assistant_msg and ("where did you notice" in last_assistant_msg or "could you elaborate" in last_assistant_msg or "tell me more" in last_assistant_msg or "more detail" in last_assistant_msg):
+            already_probed = True
+
+        # If answer is brief/vague/negative and we haven't probed yet, trigger mock dynamic probing
+        is_brief_or_negative = len(cleaned_in) < 15 or any(w in cleaned_in for w in ["lag", "slow", "bug", "bad", "error", "no", "pricing", "expensive"])
+        
+        if is_brief_or_negative and not already_probed:
+            is_probe_turn = True
+            if "lag" in cleaned_in or "slow" in cleaned_in or "bug" in cleaned_in or "error" in cleaned_in:
+                validation = "Oh no, database setups and app speed can be really tricky! "
+                probe_question = "Where did you notice the issue most—during file uploads or loading the dashboard?"
+            elif "pricing" in cleaned_in or "expensive" in cleaned_in or "cost" in cleaned_in:
+                validation = "I hear you, pricing structure is always a big factor. "
+                probe_question = "Could you elaborate—are you looking for a lower entry tier or more features in the current tiers?"
+            else:
+                validation = "Ah, thanks for sharing that. "
+                probe_question = f"Could you tell me a little bit more detail about what you mean by '{latest_input.strip()}'?"
+        else:
+            # We either already probed once or the input is detailed. Extract it!
+            val = latest_input.strip()
+            if current_field["type"] == "number":
+                try:
+                    val = int(val)
+                except ValueError:
+                    pass
+            new_extracted[current_field["id"]] = val
+            
+            # Empathetic Active Listening validation anchor based on input sentiment
+            if len(cleaned_in) > 25:
+                validation = "Ah, that makes a lot of sense, I appreciate the detail. "
+            elif any(w in cleaned_in for w in ["bug", "lag", "slow", "error"]):
+                validation = "Oh wow, that sounds really frustrating. I totally get why that's a bottleneck. "
+            elif any(w in cleaned_in for w in ["expensive", "price", "cost"]):
+                validation = "Yeah, pricing is always a major factor. I hear you. "
+            else:
+                validation = "Great, got it. "
 
     # Find the next empty field
     next_field = None
@@ -629,29 +671,17 @@ def _mock_conversation_turn(form_dict: dict, history: list, extracted_so_far: di
     # Calculate fatigue based on message length
     fatigue = "low"
     if latest_input and len(latest_input) < 10:
-        # Very short message, fatigue increases
         fatigue = "medium"
     if len(history) >= 8:
         fatigue = "high"
 
-    # Wrap up if no next field or high fatigue
-    form_complete = next_field is None or fatigue == "high"
-
-    # Dynamic casual validation responses based on field types
-    validation = "Got it, thanks. "
-    if latest_input:
-        cleaned_in = latest_input.lower()
-        if len(latest_input) > 25:
-            validation = "Ah, that makes a lot of sense, I appreciate the detail. "
-        elif "bug" in cleaned_in or "lag" in cleaned_in or "slow" in cleaned_in:
-            validation = "Oh wow, that sounds really frustrating. I totally get why that's a bottleneck. "
-        elif "expensive" in cleaned_in or "price" in cleaned_in or "cost" in cleaned_in:
-            validation = "Yeah, pricing is always a major factor. I hear you. "
-        else:
-            validation = "Great, got it. "
+    # Wrap up if no next field or high fatigue, unless we are currently in a probe turn
+    form_complete = (next_field is None and not is_probe_turn) or fatigue == "high"
 
     if form_complete:
         msg = f"{validation}Thanks so much for taking the time to share your thoughts with me today! We've recorded your responses."
+    elif is_probe_turn:
+        msg = f"{validation}{probe_question}"
     else:
         # Use planned pacing question if available
         pacing_q = next_field.get("pacing_question", "")
