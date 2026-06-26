@@ -48,6 +48,28 @@ async def keep_awake_loop():
             except Exception:
                 pass  # Silently fail to avoid console spam
 
+async def dispatch_webhook(webhook_url: str, webhook_secret: str, payload: dict):
+    if not webhook_url:
+        return
+    import hmac
+    import hashlib
+    headers = {"Content-Type": "application/json"}
+    payload_str = json.dumps(payload)
+    if webhook_secret:
+        signature = hmac.new(
+            webhook_secret.encode("utf-8"),
+            payload_str.encode("utf-8"),
+            hashlib.sha256
+        ).hexdigest()
+        headers["X-FormPulse-Signature"] = f"sha256={signature}"
+        
+    async with httpx.AsyncClient() as client:
+        try:
+            await client.post(webhook_url, content=payload_str, headers=headers, timeout=10.0)
+            print(f"[Webhook] Successfully dispatched to {webhook_url}")
+        except Exception as e:
+            print(f"[Webhook] Failed to dispatch to {webhook_url}: {e}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Launch the infinite loop in the background when FastAPI starts
@@ -309,7 +331,9 @@ def create_form(data: dict, user_id: str = Depends(get_current_user), db: DBSess
             objective=objective,
             schema_fields=json.dumps(fields),
             guardrails=json.dumps(data.get("guardrails", {})),
-            settings=json.dumps(data.get("settings", {}))
+            settings=json.dumps(data.get("settings", {})),
+            webhook_url=data.get("webhook_url"),
+            webhook_secret=data.get("webhook_secret")
         )
 
     db.add(new_form)
@@ -419,6 +443,10 @@ def update_form(form_id: str, data: dict, user_id: str = Depends(get_current_use
         form.guardrails = json.dumps(data["guardrails"])
     if "settings" in data:
         form.settings = json.dumps(data["settings"])
+    if "webhook_url" in data:
+        form.webhook_url = data["webhook_url"]
+    if "webhook_secret" in data:
+        form.webhook_secret = data["webhook_secret"]
 
     db.commit()
     db.refresh(form)
@@ -848,6 +876,22 @@ async def respond_to_survey(
 
     if form_complete:
         survey_session.status = "completed"
+        
+        # Trigger outbound webhook
+        if form.webhook_url:
+            webhook_payload = {
+                "form_id": form.id,
+                "form_title": form.title,
+                "session_id": survey_session.id,
+                "status": "completed",
+                "extracted_data": extracted,
+                "metadata": {
+                    "fatigue_index": new_fatigue
+                },
+                "transcript": history
+            }
+            asyncio.create_task(dispatch_webhook(form.webhook_url, form.webhook_secret, webhook_payload))
+
         # Save response in database
         response = Response(
             id=str(uuid.uuid4()),
@@ -1268,6 +1312,21 @@ async def whatsapp_webhook(payload: dict, db: DBSession = Depends(get_db)):
         if result.get("form_complete"):
             active_session.status = "completed"
             
+            # Trigger outbound webhook
+            if form.webhook_url:
+                webhook_payload = {
+                    "form_id": form.id,
+                    "form_title": form.title,
+                    "session_id": active_session.id,
+                    "status": "completed",
+                    "extracted_data": result["extracted_data"],
+                    "metadata": {
+                        "fatigue_index": new_fatigue
+                    },
+                    "transcript": history
+                }
+                asyncio.create_task(dispatch_webhook(form.webhook_url, form.webhook_secret, webhook_payload))
+
             # Save Final Response Row
             final_response = Response(
                 id=str(uuid.uuid4()),

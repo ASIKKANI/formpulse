@@ -59,6 +59,8 @@ class Form(Base):
     schema_fields = Column(Text, default="[]") 
     guardrails = Column(Text, default="{}")
     settings = Column(Text, default="{}")
+    webhook_url = Column(String, nullable=True)
+    webhook_secret = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     sessions = relationship("Session", back_populates="form", cascade="all, delete-orphan")
@@ -73,6 +75,8 @@ class Form(Base):
             "schema_fields": json.loads(self.schema_fields),
             "guardrails": json.loads(self.guardrails),
             "settings": json.loads(self.settings),
+            "webhook_url": self.webhook_url,
+            "webhook_secret": self.webhook_secret,
             "created_at": self.created_at.isoformat() if self.created_at else None
         }
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   ArrowUp, ArrowDown, Plus, Trash2, Shield, 
-  Settings2, Eye, Cpu, Database, Save,
+  Settings2, Eye, Cpu, Database, Save, Webhook,
   Share2, Copy, Download, X, ExternalLink,
   Palette, Upload, Image
 } from 'lucide-react';
@@ -29,6 +29,9 @@ export default function AIWorkspace({ activeForm, selectForm, onNavigate, forms,
 
   const [aiPrompt, setAiPrompt] = useState('');
   const [isAiBuilding, setIsAiBuilding] = useState(false);
+
+  const [webhookUrl, setWebhookUrl] = useState(activeForm.webhook_url || '');
+  const [webhookSecret, setWebhookSecret] = useState(activeForm.webhook_secret || '');
 
   // Sharing Modal states
   const [showShareModal, setShowShareModal] = useState(false);
@@ -202,7 +205,9 @@ export default function AIWorkspace({ activeForm, selectForm, onNavigate, forms,
           objective,
           schema_fields: fields,
           guardrails,
-          settings
+          settings,
+          webhook_url: webhookUrl,
+          webhook_secret: webhookSecret
         })
       });
       if (!response.ok) {
@@ -791,6 +796,37 @@ export default function AIWorkspace({ activeForm, selectForm, onNavigate, forms,
                   className="input-field" 
                   value={guardrails.topics_allowed}
                   onChange={e => setGuardrails({ ...guardrails, topics_allowed: e.target.value })}
+                  style={{ fontSize: '0.8rem' }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Webhook Integrations */}
+          <div className="card-container">
+            <h4 className="card-title" style={{ fontSize: '0.95rem', marginBottom: '0.75rem' }}>
+              <Webhook size={16} style={{ color: 'var(--accent)' }} /> Outbound Webhook Integration
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Target Webhook URL</label>
+                <input 
+                  type="url" 
+                  className="input-field" 
+                  value={webhookUrl}
+                  onChange={e => setWebhookUrl(e.target.value)}
+                  placeholder="https://hooks.zapier.com/..."
+                  style={{ fontSize: '0.8rem' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>HMAC Secret Token (Optional)</label>
+                <input 
+                  type="password" 
+                  className="input-field" 
+                  value={webhookSecret}
+                  onChange={e => setWebhookSecret(e.target.value)}
+                  placeholder="Secret token to sign payload requests"
                   style={{ fontSize: '0.8rem' }}
                 />
               </div>

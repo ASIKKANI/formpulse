@@ -396,7 +396,8 @@ export default function Dashboard({ onNavigate, forms, setForms, selectForm, set
 
   // Generate embed code
   const getEmbedCode = (formId) => {
-    return `<iframe src="${getShareLink(formId)}" width="100%" height="600" frameborder="0" style="border:1px solid #1e1e24; border-radius:12px;"></iframe>`;
+    const origin = window.location.origin;
+    return `<script src="${origin}/formpulse-widget.js" data-form-id="${formId}"></script>`;
   };
 
   const posCount = stats.sentimentDistribution?.Positive || 0;
