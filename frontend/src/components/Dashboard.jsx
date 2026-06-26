@@ -867,7 +867,7 @@ export default function Dashboard({ onNavigate, forms, setForms, selectForm, set
               {/* WhatsApp Share URL */}
               <div style={{ width: '100%' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.35rem', fontWeight: 600 }}>
-                  WhatsApp Native Survey Link (OpenWA)
+                  WhatsApp Native Survey Link (PickyAssist)
                 </label>
                 <div className="share-url-container">
                   <div className="share-url">{`https://api.whatsapp.com/send?text=${encodeURIComponent('start_survey_' + shareForm.id)}`}</div>

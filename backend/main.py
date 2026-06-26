@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session as DBSession
+from contextlib import asynccontextmanager
 import jwt
 import re
 import base64
@@ -31,40 +32,30 @@ os.makedirs("uploads", exist_ok=True)
 # Initialize database
 init_db()
 
-app = FastAPI(title="FormPulse API", version="1.0")
-
 import asyncio
 
 async def keep_awake_loop():
-    """Pings the external URLs every 10 minutes to prevent Render free tier sleep."""
+    """Pings the backend URL every 10 minutes to prevent Render free tier sleep."""
     import httpx
     while True:
         await asyncio.sleep(600)  # 10 minutes (Render sleeps after 15)
-        # Grab external URLs from env
         backend_url = os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8000")
-        openwa_url = os.getenv("OPENWA_EXTERNAL_URL")
-        
-        # Fallback to OPENWA_API_URL if OPENWA_EXTERNAL_URL isn't explicitly set
-        if not openwa_url:
-            openwa_api = os.getenv("OPENWA_API_URL", "http://localhost:2785/api")
-            openwa_url = openwa_api.replace("/api", "")
-        
-        urls_to_ping = [f"{backend_url}/api/health"]
-        if openwa_url and "localhost" not in openwa_url:
-            urls_to_ping.append(openwa_url) # Pinging the root domain of OpenWA keeps it awake
+        url_to_ping = f"{backend_url}/api/health"
         
         async with httpx.AsyncClient() as client:
-            for url in urls_to_ping:
-                try:
-                    await client.get(url, timeout=10.0)
-                    print(f"[Keep Awake] Pinged {url} successfully to prevent Render sleep.")
-                except Exception as e:
-                    print(f"[Keep Awake] Failed to ping {url}: {e}")
+            try:
+                await client.get(url_to_ping, timeout=10.0)
+            except Exception:
+                pass  # Silently fail to avoid console spam
 
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     # Launch the infinite loop in the background when FastAPI starts
-    asyncio.create_task(keep_awake_loop())
+    task = asyncio.create_task(keep_awake_loop())
+    yield
+    task.cancel()
+
+app = FastAPI(title="FormPulse API", version="1.0", lifespan=lifespan)
 
 # Mount uploads folder statically for zero-config file serving
 app.mount("/api/uploads", StaticFiles(directory="uploads"), name="uploads")
