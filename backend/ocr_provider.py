@@ -1,7 +1,7 @@
 import os
 import httpx
 
-OCR_API_KEY = "K82647400788957"
+OCR_API_KEY = os.getenv("OCR_API_KEY", "")
 OCR_API_URL = "https://api.ocr.space/parse/image"
 
 def parse_document(file_path: str) -> str:

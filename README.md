@@ -48,10 +48,12 @@ The system is split into a React-based frontend single-page application and a hi
 │   │       └── supabaseClient.js
 │   └── vercel.json             # Frontend rewrite routing rules
 ├── backend/                    # FastAPI Web Service
-│   ├── main.py                 # API endpoints, JWT token verification
+│   ├── main.py                 # API endpoints, JWT token verification, PickyAssist webhooks
 │   ├── database.py             # SQLAlchemy models (PostgreSQL / SQLite)
 │   ├── llm_provider.py         # LLM completion loops and Whisper transcription
-│   ├── clustering.py           # ML-based response vectorization & clustering
+│   ├── clustering.py           # ML-based response vectorization & clustering (scikit-learn)
+│   ├── ocr_provider.py         # OCR.space API integration for extracting text from images
+│   ├── whatsapp_provider.py    # PickyAssist WhatsApp Push API integration
 │   └── render.yaml             # Render infrastructure deployment config
 └── logo.png                    # Project logo asset
 ```
@@ -71,9 +73,9 @@ The system is split into a React-based frontend single-page application and a hi
    ```
 2. Initialize virtual environment:
    ```bash
-   python -m venv .venv
-   .venv/Scripts/activate  # On Windows
-   # source .venv/bin/activate  # On macOS/Linux
+   python -m venv venv
+   venv\Scripts\activate  # On Windows
+   # source venv/bin/activate  # On macOS/Linux
    ```
 3. Install required packages:
    ```bash
@@ -100,7 +102,7 @@ The system is split into a React-based frontend single-page application and a hi
    ```
 3. Copy the environment variables template and configure your Supabase instance:
    ```bash
-   cp .env.example .env
+   cp .env.example .env.local
    ```
 4. Start the local development server:
    ```bash
@@ -119,8 +121,11 @@ The system is split into a React-based frontend single-page application and a hi
 | `GROQ_API_KEY` | Yes | API access key for Groq LLM and Whisper |
 | `SUPABASE_DATABASE_URL` | No | PostgreSQL connection string (falls back to local SQLite if omitted) |
 | `SUPABASE_JWT_SECRET` | No | Base64-encoded secret key used for verifying symmetric HS256 tokens |
+| `PICKY_ASSIST_TOKEN` | No | Token for Picky Assist WhatsApp Push API |
+| `PICKY_ASSIST_APP_ID` | No | App ID for Picky Assist |
+| `OCR_API_KEY` | No | API Key for OCR.space image parsing |
 
-### Frontend Configuration (`frontend/.env`)
+### Frontend Configuration (`frontend/.env.local`)
 
 | Variable | Required | Description |
 |---|---|---|
@@ -142,6 +147,8 @@ Make sure the following variables are configured in the Render Dashboard under E
 * `SUPABASE_DATABASE_URL`
 * `SUPABASE_JWT_SECRET`
 * `GROQ_API_KEY`
+* `PICKY_ASSIST_TOKEN`
+* `PICKY_ASSIST_APP_ID`
 
 ---
 
