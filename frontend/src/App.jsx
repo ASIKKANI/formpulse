@@ -231,8 +231,33 @@ export default function App() {
     );
   }
 
+  const urlParams = new URLSearchParams(window.location.search);
+  const isEmbedded = urlParams.get('embedded') === 'true';
+
   // ----- Respondent Survey View -----
   if (isRespondent && respondentFormId) {
+    if (isEmbedded) {
+      return (
+        <div style={{ 
+          height: '100vh', 
+          width: '100vw', 
+          background: '#ffffff',
+          display: 'flex', 
+          flexDirection: 'column',
+          '--bg-color': '#f9fafb',
+          '--card-bg': '#ffffff',
+          '--text-primary': '#111827',
+          '--text-muted': '#6b7280',
+          '--card-border': '#e5e7eb',
+          '--shadow-sm': '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+          '--shadow-md': '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+          '--accent-color': '#2563eb'
+        }}>
+          <FormFiller formId={respondentFormId} standalone={true} />
+        </div>
+      );
+    }
+
     return (
       <div style={{ height: '100vh', width: '100vw', backgroundColor: 'var(--bg-color)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
         <div style={{ width: '100%', maxWidth: '600px', height: '100%', borderLeft: '1px solid var(--card-border)', borderRight: '1px solid var(--card-border)', background: 'var(--card-bg)' }}>

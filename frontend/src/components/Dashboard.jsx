@@ -396,7 +396,8 @@ export default function Dashboard({ onNavigate, forms, setForms, selectForm, set
 
   // Generate embed code
   const getEmbedCode = (formId) => {
-    return `<iframe src="${getShareLink(formId)}" width="100%" height="600" frameborder="0" style="border:1px solid #1e1e24; border-radius:12px;"></iframe>`;
+    const origin = window.location.origin;
+    return `<script src="${origin}/formpulse-widget.js" data-form-id="${formId}"></script>`;
   };
 
   const posCount = stats.sentimentDistribution?.Positive || 0;
@@ -867,7 +868,7 @@ export default function Dashboard({ onNavigate, forms, setForms, selectForm, set
               {/* WhatsApp Share URL */}
               <div style={{ width: '100%' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.35rem', fontWeight: 600 }}>
-                  WhatsApp Native Survey Link (OpenWA)
+                  WhatsApp Native Survey Link (PickyAssist)
                 </label>
                 <div className="share-url-container">
                   <div className="share-url">{`https://api.whatsapp.com/send?text=${encodeURIComponent('start_survey_' + shareForm.id)}`}</div>

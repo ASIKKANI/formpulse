@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session as DBSession
+from contextlib import asynccontextmanager
 import jwt
 import re
 import base64
@@ -31,40 +32,52 @@ os.makedirs("uploads", exist_ok=True)
 # Initialize database
 init_db()
 
-app = FastAPI(title="FormPulse API", version="1.0")
-
 import asyncio
 
 async def keep_awake_loop():
-    """Pings the external URLs every 10 minutes to prevent Render free tier sleep."""
+    """Pings the backend URL every 10 minutes to prevent Render free tier sleep."""
     import httpx
     while True:
         await asyncio.sleep(600)  # 10 minutes (Render sleeps after 15)
-        # Grab external URLs from env
         backend_url = os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8000")
-        openwa_url = os.getenv("OPENWA_EXTERNAL_URL")
-        
-        # Fallback to OPENWA_API_URL if OPENWA_EXTERNAL_URL isn't explicitly set
-        if not openwa_url:
-            openwa_api = os.getenv("OPENWA_API_URL", "http://localhost:2785/api")
-            openwa_url = openwa_api.replace("/api", "")
-        
-        urls_to_ping = [f"{backend_url}/api/health"]
-        if openwa_url and "localhost" not in openwa_url:
-            urls_to_ping.append(openwa_url) # Pinging the root domain of OpenWA keeps it awake
+        url_to_ping = f"{backend_url}/api/health"
         
         async with httpx.AsyncClient() as client:
-            for url in urls_to_ping:
-                try:
-                    await client.get(url, timeout=10.0)
-                    print(f"[Keep Awake] Pinged {url} successfully to prevent Render sleep.")
-                except Exception as e:
-                    print(f"[Keep Awake] Failed to ping {url}: {e}")
+            try:
+                await client.get(url_to_ping, timeout=10.0)
+            except Exception:
+                pass  # Silently fail to avoid console spam
 
-@app.on_event("startup")
-async def startup_event():
+async def dispatch_webhook(webhook_url: str, webhook_secret: str, payload: dict):
+    if not webhook_url:
+        return
+    import hmac
+    import hashlib
+    headers = {"Content-Type": "application/json"}
+    payload_str = json.dumps(payload)
+    if webhook_secret:
+        signature = hmac.new(
+            webhook_secret.encode("utf-8"),
+            payload_str.encode("utf-8"),
+            hashlib.sha256
+        ).hexdigest()
+        headers["X-FormPulse-Signature"] = f"sha256={signature}"
+        
+    async with httpx.AsyncClient() as client:
+        try:
+            await client.post(webhook_url, content=payload_str, headers=headers, timeout=10.0)
+            print(f"[Webhook] Successfully dispatched to {webhook_url}")
+        except Exception as e:
+            print(f"[Webhook] Failed to dispatch to {webhook_url}: {e}")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     # Launch the infinite loop in the background when FastAPI starts
-    asyncio.create_task(keep_awake_loop())
+    task = asyncio.create_task(keep_awake_loop())
+    yield
+    task.cancel()
+
+app = FastAPI(title="FormPulse API", version="1.0", lifespan=lifespan)
 
 # Mount uploads folder statically for zero-config file serving
 app.mount("/api/uploads", StaticFiles(directory="uploads"), name="uploads")
@@ -318,7 +331,9 @@ def create_form(data: dict, user_id: str = Depends(get_current_user), db: DBSess
             objective=objective,
             schema_fields=json.dumps(fields),
             guardrails=json.dumps(data.get("guardrails", {})),
-            settings=json.dumps(data.get("settings", {}))
+            settings=json.dumps(data.get("settings", {})),
+            webhook_url=data.get("webhook_url"),
+            webhook_secret=data.get("webhook_secret")
         )
 
     db.add(new_form)
@@ -428,6 +443,10 @@ def update_form(form_id: str, data: dict, user_id: str = Depends(get_current_use
         form.guardrails = json.dumps(data["guardrails"])
     if "settings" in data:
         form.settings = json.dumps(data["settings"])
+    if "webhook_url" in data:
+        form.webhook_url = data["webhook_url"]
+    if "webhook_secret" in data:
+        form.webhook_secret = data["webhook_secret"]
 
     db.commit()
     db.refresh(form)
@@ -857,6 +876,22 @@ async def respond_to_survey(
 
     if form_complete:
         survey_session.status = "completed"
+        
+        # Trigger outbound webhook
+        if form.webhook_url:
+            webhook_payload = {
+                "form_id": form.id,
+                "form_title": form.title,
+                "session_id": survey_session.id,
+                "status": "completed",
+                "extracted_data": extracted,
+                "metadata": {
+                    "fatigue_index": new_fatigue
+                },
+                "transcript": history
+            }
+            asyncio.create_task(dispatch_webhook(form.webhook_url, form.webhook_secret, webhook_payload))
+
         # Save response in database
         response = Response(
             id=str(uuid.uuid4()),
@@ -1277,6 +1312,21 @@ async def whatsapp_webhook(payload: dict, db: DBSession = Depends(get_db)):
         if result.get("form_complete"):
             active_session.status = "completed"
             
+            # Trigger outbound webhook
+            if form.webhook_url:
+                webhook_payload = {
+                    "form_id": form.id,
+                    "form_title": form.title,
+                    "session_id": active_session.id,
+                    "status": "completed",
+                    "extracted_data": result["extracted_data"],
+                    "metadata": {
+                        "fatigue_index": new_fatigue
+                    },
+                    "transcript": history
+                }
+                asyncio.create_task(dispatch_webhook(form.webhook_url, form.webhook_secret, webhook_payload))
+
             # Save Final Response Row
             final_response = Response(
                 id=str(uuid.uuid4()),

@@ -1,16 +1,21 @@
 # Dependencies
 node_modules/
 .venv/
+venv/
+backend/venv/
 __pycache__/
+backend/__pycache__/
 
 # Environment variables (NEVER commit secrets)
 .env
 backend/.env
 frontend/.env
+.env.local
 
 # Database files
 *.db
 formpulse.db
+backend/formpulse.db
 
 # Build output
 frontend/dist/
@@ -26,16 +31,48 @@ Thumbs.db
 *.swp
 *.swo
 
-# Upload artifacts
+# Upload artifacts & Data
+# Dependencies
+node_modules/
+.venv/
+venv/
+backend/venv/
+__pycache__/
+backend/__pycache__/
+
+# Environment variables (NEVER commit secrets)
+.env
+backend/.env
+frontend/.env
+.env.local
+
+# Database files
+*.db
+formpulse.db
+backend/formpulse.db
+
+# Build output
+frontend/dist/
+frontend/build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Upload artifacts & Data
 backend/uploads/
 uploads/
+backend/chroma_db/
+chroma_db/
 
 # Logs
 *.log
 
 .vercel
-# Third-party Services
-OpenWA/
-
-# Vector DB
-backend/chroma_db/
+test.html
